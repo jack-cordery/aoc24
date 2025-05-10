@@ -1,8 +1,6 @@
 use ahash::AHashMap;
-use rayon::prelude::*;
 use std::env;
 use std::io;
-use std::sync::Mutex;
 use std::time::Instant;
 
 fn main() -> io::Result<()> {
@@ -15,17 +13,15 @@ fn main() -> io::Result<()> {
         ));
     }
     let content = std::fs::read_to_string(&args[1])?;
-    let v1 = Mutex::new(Vec::new());
-    let v2 = Mutex::new(Vec::new());
-    content.par_lines().for_each(|line| {
+    let mut v1 = Vec::new();
+    let mut v2 = Vec::new();
+    content.lines().for_each(|line| {
         let mut parts = line.split_whitespace().map(|s| s.parse::<u32>().unwrap());
         if let (Some(f), Some(s), None) = (parts.next(), parts.next(), parts.next()) {
-            v1.lock().unwrap().push(f);
-            v2.lock().unwrap().push(s);
+            v1.push(f);
+            v2.push(s);
         };
     });
-    let mut v1 = v1.into_inner().unwrap();
-    let mut v2 = v2.into_inner().unwrap();
     v1.sort_unstable();
     v2.sort_unstable();
 
