@@ -1,0 +1,8 @@
+[package]
+name = "aoc24"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ahash = "0.8.12"
+rayon = "1.10.0"
