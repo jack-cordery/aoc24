@@ -58,7 +58,7 @@ fn check_safety(input: Vec<u8>) -> bool {
 }
 
 /// Returns -1 if the input is safe and otherwise returns the pos of the first offending number
-fn check_safety_with_pos(input: &Vec<u8>) -> i8 {
+fn check_safety_with_pos(input: &[u8]) -> i8 {
     // need to check that the vector is either strictly increasing or or decreasing
     // each step can only have a delta of 1,2,3
     let mut delta;
@@ -77,7 +77,7 @@ fn check_safety_with_pos(input: &Vec<u8>) -> i8 {
     -1
 }
 
-fn check_safety_dampner(input: &Vec<u8>) -> bool {
+fn check_safety_dampner(input: &[u8]) -> bool {
     // ok this time we are allowed one mistake so what we will do
     // we can use check with pos to try twice with removing the offending pos and then retrying
     // so we have an edge case where in the first two postiion if it looks like its decreasing but
@@ -89,7 +89,7 @@ fn check_safety_dampner(input: &Vec<u8>) -> bool {
     if first_try == -1 {
         return true;
     }
-    let mut second_input = input.clone();
+    let mut second_input = input.to_vec();
     second_input.remove(first_try as usize);
     let second_try = check_safety_with_pos(&second_input);
     if second_try == -1 {
@@ -98,7 +98,7 @@ fn check_safety_dampner(input: &Vec<u8>) -> bool {
     if first_try < 3 {
         while first_try > 0 {
             let last_try = first_try - 1;
-            let mut last_input = input.clone();
+            let mut last_input = input.to_vec();
             last_input.remove(last_try as usize);
             let last_try = check_safety_with_pos(&last_input);
             if last_try == -1 {
@@ -188,15 +188,15 @@ mod tests {
 
     #[test]
     fn test_check_safety_damper() {
-        assert!(check_safety_dampner(&vec![7, 6, 4, 2, 1]));
-        assert!(!check_safety_dampner(&vec![1, 2, 7, 8, 9]));
-        assert!(!check_safety_dampner(&vec![9, 7, 6, 2, 1]));
-        assert!(check_safety_dampner(&vec![1, 3, 2, 4, 5]));
-        assert!(check_safety_dampner(&vec![8, 6, 4, 4, 1]));
-        assert!(check_safety_dampner(&vec![1, 3, 6, 7, 9]));
-        assert!(!check_safety_dampner(&vec![16, 17, 18, 2, 1, 24, 21]));
-        assert!(check_safety_dampner(&vec![12, 10, 13, 16, 19, 21, 22]));
-        assert!(check_safety_dampner(&vec![88, 90, 88, 86, 84, 82, 80]));
+        assert!(check_safety_dampner(&[7, 6, 4, 2, 1]));
+        assert!(!check_safety_dampner(&[1, 2, 7, 8, 9]));
+        assert!(!check_safety_dampner(&[9, 7, 6, 2, 1]));
+        assert!(check_safety_dampner(&[1, 3, 2, 4, 5]));
+        assert!(check_safety_dampner(&[8, 6, 4, 4, 1]));
+        assert!(check_safety_dampner(&[1, 3, 6, 7, 9]));
+        assert!(!check_safety_dampner(&[16, 17, 18, 2, 1, 24, 21]));
+        assert!(check_safety_dampner(&[12, 10, 13, 16, 19, 21, 22]));
+        assert!(check_safety_dampner(&[88, 90, 88, 86, 84, 82, 80]));
     }
 
     #[test]
