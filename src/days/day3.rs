@@ -74,4 +74,12 @@ mod tests {
     fn test_sum_line() {
         assert_eq!(sum_line("mul(100,100),,, mul( 5,    1)mul(3,8)"), 10024);
     }
+
+    #[test]
+    fn test_sum_file() {
+        assert_eq!(
+            sum_file("mul(100,100)don't(),,mul(6,6), mul( 5,    1)do()mul(3,8)"),
+            10024
+        );
+    }
 }
