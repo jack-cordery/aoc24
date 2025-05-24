@@ -2,6 +2,7 @@ use regex::Regex;
 use std::fs;
 use std::io::Result;
 use std::time::Instant;
+
 // ok so we need to be able to take in an input like the other days
 // cant recall if we take an iterable or not but can check
 // but then we can take each line and then use regex to match
