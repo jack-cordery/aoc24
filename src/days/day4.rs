@@ -12,13 +12,40 @@ pub fn day_four(path: &str) -> Result<()> {
         .lines()
         .map(|l| l.unwrap().chars().collect())
         .collect();
-    let result = xmas_search(char_matrix);
+    let result = xmas_search(&char_matrix);
+    let result_two = x_mas_search(&char_matrix);
     println!(
-        "The number of XMAS codes found is {}! It took {}us to calculate",
+        "The number of XMAS codes found is {}! and the number of X-MAS codes found is {} It took {}us to calculate",
         result,
+        result_two,
         now.elapsed().as_micros()
     );
     Ok(())
+}
+
+pub fn x_mas_search(puzzle: &[Vec<char>]) -> u32 {
+    // ;alsdkfj;laskdfj;alsdkfj;alsdkjf;asldkfj;asldkfja;sldkfj
+    // find all the As  and then search in the corners for MS or SM
+    let mut result = 0;
+    let max_rows = puzzle.len();
+    let max_cols = puzzle[0].len();
+    for (i, row) in puzzle.iter().enumerate() {
+        for (j, element) in row.iter().enumerate() {
+            if *element == 'A' {
+                // check the diaganols
+                if i > 0 && j > 0 && i < max_rows - 1 && j < max_cols - 1 {
+                    let mut a = puzzle[i - 1][j - 1].to_string();
+                    a.push(puzzle[i + 1][j + 1]);
+                    let mut b = puzzle[i - 1][j + 1].to_string();
+                    b.push(puzzle[i + 1][j - 1]);
+                    if (a == "MS" || a == "SM") && (b == "MS" || b == "SM") {
+                        result += 1;
+                    }
+                }
+            }
+        }
+    }
+    result
 }
 
 //Generall thinking is that store each line as a vector of characters i.e. a matrix of chars
@@ -34,7 +61,7 @@ pub fn day_four(path: &str) -> Result<()> {
 // Diag DR -> (i +1, j + 1)
 // Diag DL -> (i +1, j - 1)
 // If there is a m then continue to look in that direction (for loop )
-pub fn xmas_search(puzzle: Vec<Vec<char>>) -> u32 {
+pub fn xmas_search(puzzle: &[Vec<char>]) -> u32 {
     let mut result = 0;
     let max_rows = puzzle.len();
     let max_cols = puzzle[0].len();
@@ -119,5 +146,19 @@ pub fn xmas_search(puzzle: Vec<Vec<char>>) -> u32 {
 fn test_xmas_search() {
     let input = "XMAS\nMASX\nASXM\nSXMA\nSAMX";
     let input_matrix: Vec<Vec<char>> = input.lines().map(|l| l.chars().collect()).collect();
-    assert_eq!(xmas_search(input_matrix), 3);
+    assert_eq!(xmas_search(&input_matrix), 3);
+}
+
+#[test]
+fn test_x_mas_search() {
+    let input = "XMAS\nMASX\nASXM\nSXMA\nSAMX";
+    let input_matrix: Vec<Vec<char>> = input.lines().map(|l| l.chars().collect()).collect();
+    assert_eq!(x_mas_search(&input_matrix), 0);
+}
+
+#[test]
+fn test_xmas_search_again() {
+    let input = "AMXS\nXMAS\nAMXS";
+    let input_matrix: Vec<Vec<char>> = input.lines().map(|l| l.chars().collect()).collect();
+    assert_eq!(x_mas_search(&input_matrix), 1);
 }
