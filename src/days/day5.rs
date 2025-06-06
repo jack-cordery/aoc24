@@ -110,3 +110,97 @@ fn solver(updates: Vec<Update>, rules: Vec<Rule>) -> u64 {
     }
     sum
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_update_new() {
+        //should create a new update instance where the
+        //input is a &str like 1,2,3,4,5 and it stores a middle of 2, and hashmap with values
+        //of 1,2,3,4,5 and their posiitions 0,1,2,3,4
+        //
+        //
+        let input = "1,2,3,4,5";
+        let up = Update::new(input);
+        let mut expected_map = HashMap::new();
+        expected_map.insert(1, 0);
+        expected_map.insert(2, 1);
+        expected_map.insert(3, 2);
+        expected_map.insert(4, 3);
+        expected_map.insert(5, 4);
+        assert_eq!(up.line, input);
+        assert_eq!(up.middle, 2);
+        assert_eq!(up.map, expected_map);
+    }
+
+    #[test]
+    fn test_day_update_check() {
+        // checks the update complies with a given rule i.e. 1,2,3,4,5 and 4|5 is true but 5|4 is
+        // false
+        //
+        let update = Update::new("1,2,3,4,5");
+        let rule = Rule::from_str("4|5");
+        let rule_to_fail = Rule::from_str("5|4");
+        assert!(update.check(&rule));
+        assert!(!update.check(&rule_to_fail));
+    }
+
+    #[test]
+    fn test_day_update_check_all() {
+        let update = Update::new("1,2,3,4,5");
+        let rule = Rule::from_str("4|5");
+        let rule_to_fail = Rule::from_str("5|4");
+        let rule2 = Rule::from_str("1|2");
+        let rule3 = Rule::from_str("3|5");
+        let rule4 = Rule::from_str("1|5");
+        let rules = vec![rule, rule2];
+        let failed_rules = vec![rule3, rule4, rule_to_fail];
+
+        assert!(update.check_all(&rules));
+        assert!(!update.check_all(&failed_rules));
+    }
+
+    #[test]
+    fn test_day_to_vec() {
+        //takes the &str and creates the vec
+        //should create a new update instance where the
+        //input is a &str like 1,2,3,4,5 and it stores a middle of 2, and hashmap with values
+        //of 1,2,3,4,5 and their posiitions 0,1,2,3,4
+        //
+        //
+        let input = "1,2,3,4,5";
+        let up = Update::new(input);
+        let expected = Vec::from([1, 2, 3, 4, 5]);
+        assert_eq!(up.to_vec(), expected);
+    }
+
+    #[test]
+    fn test_day_rule_from_str() {
+        //takes &str and reutrn the x and y in a rule
+        //
+        let input = "5|4";
+        let rule = Rule::from_str(input);
+        assert_eq!(rule.x, 5);
+        assert_eq!(rule.y, 4);
+    }
+
+    #[test]
+    fn test_day_solver() {
+        //takes a vec of updates and rules and returns the sum of the middle vals of those i
+        // in correct order can
+        let update1 = Update::new("1,2,3,4,5");
+        let update2 = Update::new("10,20,30,40,50");
+        let update3 = Update::new("100,200,201,202,203");
+        let rule2 = Rule::from_str("1|2");
+        let rule3 = Rule::from_str("3|5");
+        let rule4 = Rule::from_str("1|5");
+        let rule5 = Rule::from_str("203|202");
+
+        let updates = vec![update1, update2, update3];
+        let rules = vec![rule2, rule3, rule4, rule5];
+
+        assert_eq!(solver(updates, rules), 33);
+    }
+}
