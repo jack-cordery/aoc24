@@ -33,13 +33,13 @@ pub fn day_five(path: &str) -> Result<()> {
 
 struct Update<'a> {
     line: &'a str,
-    map: HashMap<u8, usize>,
+    map: HashMap<u64, usize>,
     middle: usize,
 }
 
 impl<'a> Update<'a> {
     fn new(line: &'a str) -> Self {
-        let line_iter = line.split(",").map(|val| val.parse::<u8>().unwrap());
+        let line_iter = line.split(",").map(|val| val.parse::<u64>().unwrap());
         let mut len: usize = 0;
 
         let mut map = HashMap::new();
@@ -55,10 +55,10 @@ impl<'a> Update<'a> {
     }
 
     fn check(&self, rule: &Rule) -> bool {
-        let Some(pos_x) = self.map.get(&rule.x) else {
+        let Some(pos_y) = self.map.get(&rule.y) else {
             return true;
         };
-        let Some(pos_y) = self.map.get(&rule.y) else {
+        let Some(pos_x) = self.map.get(&rule.x) else {
             return true;
         };
         pos_x < pos_y
@@ -74,17 +74,18 @@ impl<'a> Update<'a> {
         true
     }
 
-    fn to_vec(&self) -> Vec<u8> {
+    fn to_vec(&self) -> Vec<u64> {
         self.line
             .split(",")
-            .map(|val| val.parse::<u8>().unwrap())
+            .map(|val| val.parse::<u64>().unwrap())
             .collect()
     }
 }
 
+#[derive(Debug)]
 struct Rule {
-    x: u8,
-    y: u8,
+    x: u64,
+    y: u64,
 }
 
 impl Rule {
@@ -93,8 +94,8 @@ impl Rule {
 
         let (x, y) = line.split_once("|").unwrap();
         Rule {
-            x: x.parse::<u8>().unwrap(),
-            y: y.parse::<u8>().unwrap(),
+            x: x.parse::<u64>().unwrap(),
+            y: y.parse::<u64>().unwrap(),
         }
     }
 }
@@ -104,8 +105,15 @@ fn solver(updates: Vec<Update>, rules: Vec<Rule>) -> u64 {
     let mut sum: u64 = 0;
     for update in updates {
         let valid = update.check_all(&rules);
+        println!(
+            "update: {} with length is {valid} and middle {}",
+            update.line, update.middle
+        );
         if valid {
-            sum += update.to_vec()[update.middle] as u64;
+            let middle_val = update.to_vec()[update.middle];
+            println!("with value {middle_val}");
+            sum += middle_val;
+            println!("sum is now {sum}");
         }
     }
     sum
@@ -120,8 +128,6 @@ mod tests {
         //should create a new update instance where the
         //input is a &str like 1,2,3,4,5 and it stores a middle of 2, and hashmap with values
         //of 1,2,3,4,5 and their posiitions 0,1,2,3,4
-        //
-        //
         let input = "1,2,3,4,5";
         let up = Update::new(input);
         let mut expected_map = HashMap::new();
