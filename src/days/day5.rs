@@ -18,17 +18,20 @@ pub fn day_five(path: &str) -> Result<()> {
     let (first, second) = contents.split_once("\n\n").unwrap();
 
     let rules: Vec<Rule> = first.lines().map(Rule::from_str).collect();
-    let updates: Vec<Update> = second
+    let mut updates: Vec<Update> = second
         .lines()
         .map(|line| Update::new(line.into()))
         .collect();
 
+    let updates_slice: &mut [Update] = &mut updates;
+
     // apply solver to all the lines and count the bools
-    let answer = solver(updates, rules);
+    let (answer, fixed_answer) = solver(updates_slice, rules);
 
     println!(
-        "the answer is {} and the time elapsed is {}",
+        "the answer is {} with {} and the time elapsed is {}",
         answer,
+        fixed_answer,
         now.elapsed().as_micros()
     );
     Ok(())
@@ -72,7 +75,7 @@ impl Update {
         pos_x < pos_y
     }
 
-    fn fix(&mut self, rule: &Rule) {
+    fn fix(&mut self, rule: &Rule) -> bool {
         // this should take the update and check against the rule
         // if the rule fails then change the underlying values
         // of self so that it is fixed
@@ -86,19 +89,21 @@ impl Update {
         let map_y = &self.map.get(&rule.y).cloned();
 
         let Some(pos_y) = map_y else {
-            return;
+            return true;
         };
         let Some(pos_x) = map_x else {
-            return;
+            return true;
         };
         if pos_x < pos_y {
-            return;
+            return true;
         }
         self.vec.swap(*pos_x, *pos_y);
         self.line = Self::vec_to_csv(&self.vec);
 
         self.map.insert(rule.x, *pos_y);
         self.map.insert(rule.y, *pos_x);
+
+        false
     }
 
     fn vec_to_csv(vec_vals: &[u64]) -> String {
@@ -114,6 +119,15 @@ impl Update {
             }
         }
         true
+    }
+
+    fn fix_all(&mut self, rules: &[Rule]) {
+        for rule in rules {
+            let valid = self.fix(rule);
+            if !valid {
+                return self.fix_all(rules);
+            }
+        }
     }
 }
 
@@ -135,33 +149,22 @@ impl Rule {
     }
 }
 
-fn solver(updates: Vec<Update>, rules: Vec<Rule>) -> u64 {
+fn solver(updates: &mut [Update], rules: Vec<Rule>) -> (u64, u64) {
     // iteratre through all lines and check each rule is satisfied and return if follows rules
     let mut sum: u64 = 0;
+    let mut fixed_sum: u64 = 0;
     for update in updates {
         let valid = update.check_all(&rules);
-        println!(
-            "update: {} with length is {valid} and middle {}",
-            update.line, update.middle
-        );
         if valid {
             let middle_val = update.vec[update.middle];
-            println!("with value {middle_val}");
             sum += middle_val;
-            println!("sum is now {sum}");
+        } else {
+            update.fix_all(&rules);
+            let middle_val = update.vec[update.middle];
+            fixed_sum += middle_val;
         }
     }
-    sum
-}
-
-fn solver_two(updates: Vec<Update>, rules: Vec<Rule>) -> u64 {
-    // ok so this time we want to take the incorrect updates,
-    // order them correctly and then sum their middle values
-    // my thought is after each check if it returns false then to swap the two values
-    // and re-run all the checks.  I guess we are assuming that rules are written in
-    // a way that is solveable and now page orders have some kind of circular logic
-    // it isnt immedialty obvious to me if there is a more eiligant or efficient solution
-    unimplemented!()
+    (sum, fixed_sum)
 }
 
 #[cfg(test)]
@@ -239,6 +242,29 @@ mod tests {
     }
 
     #[test]
+    fn test_day_update_fix_all() {
+        let mut update = Update::new("1,2,3,4,5".into());
+        let rule_1 = Rule::from_str("5|4");
+        let rule_2 = Rule::from_str("3|2");
+        let rule_3 = Rule::from_str("5|1");
+        let expected_vec = vec![5, 3, 2, 1, 4];
+        let expected_line = "5,3,2,1,4";
+        let mut expected_map = HashMap::new();
+        expected_map.insert(5, 0);
+        expected_map.insert(3, 1);
+        expected_map.insert(2, 2);
+        expected_map.insert(1, 3);
+        expected_map.insert(4, 4);
+        let expected_middle = 2;
+
+        update.fix_all(&[rule_1, rule_2, rule_3]);
+        assert!(update.vec == expected_vec);
+        assert!(update.line == expected_line);
+        assert!(update.map == expected_map);
+        assert!(update.middle == expected_middle);
+    }
+
+    #[test]
     fn test_day_rule_from_str() {
         //takes &str and reutrn the x and y in a rule
         //
@@ -255,14 +281,16 @@ mod tests {
         let update1 = Update::new("1,2,3,4,5".into());
         let update2 = Update::new("10,20,30,40,50".into());
         let update3 = Update::new("100,200,201,202,203".into());
+
         let rule2 = Rule::from_str("1|2");
         let rule3 = Rule::from_str("3|5");
         let rule4 = Rule::from_str("1|5");
         let rule5 = Rule::from_str("203|202");
 
-        let updates = vec![update1, update2, update3];
+        let mut updates = vec![update1, update2, update3];
         let rules = vec![rule2, rule3, rule4, rule5];
+        let updates_slice: &mut [Update] = &mut updates;
 
-        assert_eq!(solver(updates, rules), 33);
+        assert_eq!(solver(updates_slice, rules), (33, 201));
     }
 }
