@@ -141,6 +141,7 @@ impl Map {
                 self.grid[current_y as usize][current_x as usize] = Tile::Current(new_dir);
             }
             Move::Finish => {
+                self.guard.history.insert(self.guard.position.clone());
                 self.grid[current_y as usize][current_x as usize] = Tile::Visited;
                 self.completed = true;
             }
@@ -234,7 +235,7 @@ impl Map {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 struct Position {
     x: u16,
     y: u16,
@@ -245,27 +246,42 @@ struct Position {
 struct Guard {
     position: Position,
     history: HashSet<Position>,
+    looped: bool,
 }
 
 impl Guard {
     fn new(x: u16, y: u16, direction: Direction) -> Self {
         let history: HashSet<Position> = HashSet::new();
         let position = Position { x, y, direction };
-        Guard { position, history }
+        Guard {
+            position,
+            history,
+            looped: false,
+        }
     }
 
     fn walk(&mut self) -> (u16, u16) {
+        self.history.insert(self.position.clone());
         match self.position.direction {
             Direction::Up => self.position.y -= 1,
             Direction::Down => self.position.y += 1,
             Direction::Left => self.position.x -= 1,
             Direction::Right => self.position.x += 1,
         };
+        match self.history.get(&self.position) {
+            Some(_) => self.looped = true,
+            None => self.looped = false,
+        };
         (self.position.x, self.position.y)
     }
 
     fn rotate(&mut self) {
+        self.history.insert(self.position.clone());
         self.position.direction.rotate();
+        match self.history.get(&self.position) {
+            Some(_) => self.looped = true,
+            None => self.looped = false,
+        };
     }
 }
 
@@ -299,33 +315,127 @@ mod test {
         assert_eq!(20, guard.position.y);
         assert_eq!(Direction::Up, guard.position.direction);
         assert_eq!(expected_history, guard.history);
+        assert!(!guard.looped);
     }
 
     #[test]
     fn test_guard_rotate() {
         let mut guard = Guard::new(10, 20, Direction::Up);
+
         guard.rotate();
         assert_eq!(Direction::Right, guard.position.direction);
+        let expected_position = Position {
+            x: 10,
+            y: 20,
+            direction: Direction::Up,
+        };
+        assert_eq!(
+            guard.history.get(&expected_position),
+            Some(&expected_position)
+        );
+        assert_eq!(guard.history.len(), 1);
+        assert!(!guard.looped);
+
         guard.rotate();
         assert_eq!(Direction::Down, guard.position.direction);
+        let expected_position = Position {
+            x: 10,
+            y: 20,
+            direction: Direction::Right,
+        };
+        assert_eq!(
+            guard.history.get(&expected_position),
+            Some(&expected_position)
+        );
+        assert_eq!(guard.history.len(), 2);
+        assert!(!guard.looped);
+
         guard.rotate();
         assert_eq!(Direction::Left, guard.position.direction);
+        let expected_position = Position {
+            x: 10,
+            y: 20,
+            direction: Direction::Down,
+        };
+        assert_eq!(
+            guard.history.get(&expected_position),
+            Some(&expected_position)
+        );
+        assert_eq!(guard.history.len(), 3);
+        assert!(!guard.looped);
+
         guard.rotate();
         assert_eq!(Direction::Up, guard.position.direction);
+        let expected_position = Position {
+            x: 10,
+            y: 20,
+            direction: Direction::Left,
+        };
+        assert_eq!(
+            guard.history.get(&expected_position),
+            Some(&expected_position)
+        );
+        assert_eq!(guard.history.len(), 4);
+        assert!(guard.looped);
     }
 
     #[test]
     fn test_test_guard_walk() {
         let mut guard = Guard::new(2, 2, Direction::Up);
+
+        // up to 2, 1
         guard.walk();
+
+        let mut expected_history = HashSet::new();
+        let prev_pos = Position {
+            x: 2,
+            y: 2,
+            direction: Direction::Up,
+        };
+        expected_history.insert(prev_pos);
+        assert_eq!(expected_history, guard.history);
         assert_eq!(2, guard.position.x);
         assert_eq!(1, guard.position.y);
+
+        // rotate to right 2,1
         guard.rotate();
+
+        expected_history.insert(Position {
+            x: 2,
+            y: 1,
+            direction: Direction::Up,
+        });
+
+        // rotate to down 2,1
         guard.rotate();
+
+        expected_history.insert(Position {
+            x: 2,
+            y: 1,
+            direction: Direction::Right,
+        });
+
+        // rotate to left 2, 1
         guard.rotate();
+
+        expected_history.insert(Position {
+            x: 2,
+            y: 1,
+            direction: Direction::Down,
+        });
+
+        // walk left to 1,1
         guard.walk();
+        expected_history.insert(Position {
+            x: 2,
+            y: 1,
+            direction: Direction::Left,
+        });
+
+        assert_eq!(1, guard.position.x);
         assert_eq!(1, guard.position.y);
-        assert_eq!(1, guard.position.y);
+        assert_eq!(Direction::Left, guard.position.direction);
+        assert_eq!(expected_history, guard.history);
     }
 
     #[test]
@@ -398,7 +508,15 @@ mod test {
             vec!['.', '>', '#'],
             vec!['.', '.', '.'],
         ]);
-        let expected_guard = Guard::new(1, 1, Direction::Right);
+        let mut expected_guard = Guard::new(1, 1, Direction::Right);
+        let prev_pos = Position {
+            x: 1,
+            y: 1,
+            direction: Direction::Up,
+        };
+        let mut clean_history = HashSet::new();
+        clean_history.insert(prev_pos);
+        expected_guard.history = clean_history.clone();
         let expected_completed = false;
         let expected_positions_visited = 1;
 
@@ -414,9 +532,16 @@ mod test {
             vec!['.', 'v', '#'],
             vec!['.', '.', '.'],
         ]);
-        let expected_guard = Guard::new(1, 1, Direction::Down);
+        let mut expected_guard = Guard::new(1, 1, Direction::Down);
         let expected_completed = false;
         let expected_positions_visited = 1;
+        let prev_pos = Position {
+            x: 1,
+            y: 1,
+            direction: Direction::Right,
+        };
+        clean_history.insert(prev_pos);
+        expected_guard.history = clean_history.clone();
 
         assert_eq!(expected_grid, map.grid);
         assert_eq!(expected_guard, map.guard);
@@ -430,9 +555,16 @@ mod test {
             vec!['.', 'X', '#'],
             vec!['.', 'v', '.'],
         ]);
-        let expected_guard = Guard::new(1, 2, Direction::Down);
+        let mut expected_guard = Guard::new(1, 2, Direction::Down);
         let expected_completed = false;
         let expected_positions_visited = 2;
+        let prev_pos = Position {
+            x: 1,
+            y: 1,
+            direction: Direction::Down,
+        };
+        clean_history.insert(prev_pos);
+        expected_guard.history = clean_history.clone();
 
         assert_eq!(expected_grid, map.grid);
         assert_eq!(expected_guard, map.guard);
@@ -446,9 +578,16 @@ mod test {
             vec!['.', 'X', '#'],
             vec!['.', 'X', '.'],
         ]);
-        let expected_guard = Guard::new(1, 2, Direction::Down);
+        let mut expected_guard = Guard::new(1, 2, Direction::Down);
         let expected_completed = true;
         let expected_positions_visited = 2;
+        let prev_pos = Position {
+            x: 1,
+            y: 2,
+            direction: Direction::Down,
+        };
+        clean_history.insert(prev_pos);
+        expected_guard.history = clean_history.clone();
 
         assert_eq!(expected_grid, map.grid);
         assert_eq!(expected_guard, map.guard);
