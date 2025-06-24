@@ -1,4 +1,5 @@
 use std::cmp::PartialEq;
+use std::collections::HashSet;
 use std::fs::read;
 use std::io::BufRead;
 use std::time::Instant;
@@ -21,7 +22,7 @@ enum Move {
     Finish,
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 enum Direction {
     Up,
     Down,
@@ -128,15 +129,15 @@ impl Map {
     fn step(&mut self) {
         // here we will update the map with the new iteration
         let next_move = self.calculate_next_step();
-        let current_x = self.guard.x;
-        let current_y = self.guard.y;
-        let current_dir = self.guard.direction.clone();
+        let current_x = self.guard.position.x;
+        let current_y = self.guard.position.y;
+        let current_dir = self.guard.position.direction.clone();
 
         match next_move {
             Move::Rotate => {
                 self.guard.rotate();
 
-                let new_dir = self.guard.direction.clone();
+                let new_dir = self.guard.position.direction.clone();
                 self.grid[current_y as usize][current_x as usize] = Tile::Current(new_dir);
             }
             Move::Finish => {
@@ -161,10 +162,11 @@ impl Map {
         // obstacle in that direction if not move in that dierecti0on
         // account for off map
 
-        match self.guard.direction {
+        match self.guard.position.direction {
             Direction::Up => {
-                if self.guard.y > 0 {
-                    if self.grid[(self.guard.y - 1) as usize][self.guard.x as usize]
+                if self.guard.position.y > 0 {
+                    if self.grid[(self.guard.position.y - 1) as usize]
+                        [self.guard.position.x as usize]
                         == Tile::Obstacle
                     {
                         return Move::Rotate;
@@ -175,8 +177,9 @@ impl Map {
             }
 
             Direction::Down => {
-                if (self.guard.y as usize) < self.grid.len() - 1 {
-                    if self.grid[(self.guard.y + 1) as usize][self.guard.x as usize]
+                if (self.guard.position.y as usize) < self.grid.len() - 1 {
+                    if self.grid[(self.guard.position.y + 1) as usize]
+                        [self.guard.position.x as usize]
                         == Tile::Obstacle
                     {
                         return Move::Rotate;
@@ -187,8 +190,9 @@ impl Map {
             }
 
             Direction::Left => {
-                if self.guard.x > 0 {
-                    if self.grid[self.guard.y as usize][(self.guard.x - 1) as usize]
+                if self.guard.position.x > 0 {
+                    if self.grid[self.guard.position.y as usize]
+                        [(self.guard.position.x - 1) as usize]
                         == Tile::Obstacle
                     {
                         return Move::Rotate;
@@ -198,8 +202,9 @@ impl Map {
                 Move::Finish
             }
             Direction::Right => {
-                if (self.guard.x as usize) < self.grid.first().unwrap().len() - 1 {
-                    if self.grid[self.guard.y as usize][(self.guard.x + 1) as usize]
+                if (self.guard.position.x as usize) < self.grid.first().unwrap().len() - 1 {
+                    if self.grid[self.guard.position.y as usize]
+                        [(self.guard.position.x + 1) as usize]
                         == Tile::Obstacle
                     {
                         return Move::Rotate;
@@ -229,30 +234,38 @@ impl Map {
     }
 }
 
-#[derive(Debug, PartialEq)]
-struct Guard {
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct Position {
     x: u16,
     y: u16,
     direction: Direction,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct Guard {
+    position: Position,
+    history: HashSet<Position>,
+}
+
 impl Guard {
     fn new(x: u16, y: u16, direction: Direction) -> Self {
-        Guard { x, y, direction }
+        let history: HashSet<Position> = HashSet::new();
+        let position = Position { x, y, direction };
+        Guard { position, history }
     }
 
     fn walk(&mut self) -> (u16, u16) {
-        match self.direction {
-            Direction::Up => self.y -= 1,
-            Direction::Down => self.y += 1,
-            Direction::Left => self.x -= 1,
-            Direction::Right => self.x += 1,
+        match self.position.direction {
+            Direction::Up => self.position.y -= 1,
+            Direction::Down => self.position.y += 1,
+            Direction::Left => self.position.x -= 1,
+            Direction::Right => self.position.x += 1,
         };
-        (self.x, self.y)
+        (self.position.x, self.position.y)
     }
 
     fn rotate(&mut self) {
-        self.direction.rotate();
+        self.position.direction.rotate();
     }
 }
 
@@ -281,36 +294,38 @@ mod test {
     #[test]
     fn test_guard_new() {
         let guard = Guard::new(10, 20, Direction::Up);
-        assert_eq!(10, guard.x);
-        assert_eq!(20, guard.y);
-        assert_eq!(Direction::Up, guard.direction);
+        let expected_history: HashSet<Position> = HashSet::new();
+        assert_eq!(10, guard.position.x);
+        assert_eq!(20, guard.position.y);
+        assert_eq!(Direction::Up, guard.position.direction);
+        assert_eq!(expected_history, guard.history);
     }
 
     #[test]
     fn test_guard_rotate() {
         let mut guard = Guard::new(10, 20, Direction::Up);
         guard.rotate();
-        assert_eq!(Direction::Right, guard.direction);
+        assert_eq!(Direction::Right, guard.position.direction);
         guard.rotate();
-        assert_eq!(Direction::Down, guard.direction);
+        assert_eq!(Direction::Down, guard.position.direction);
         guard.rotate();
-        assert_eq!(Direction::Left, guard.direction);
+        assert_eq!(Direction::Left, guard.position.direction);
         guard.rotate();
-        assert_eq!(Direction::Up, guard.direction);
+        assert_eq!(Direction::Up, guard.position.direction);
     }
 
     #[test]
     fn test_test_guard_walk() {
         let mut guard = Guard::new(2, 2, Direction::Up);
         guard.walk();
-        assert_eq!(2, guard.x);
-        assert_eq!(1, guard.y);
+        assert_eq!(2, guard.position.x);
+        assert_eq!(1, guard.position.y);
         guard.rotate();
         guard.rotate();
         guard.rotate();
         guard.walk();
-        assert_eq!(1, guard.y);
-        assert_eq!(1, guard.y);
+        assert_eq!(1, guard.position.y);
+        assert_eq!(1, guard.position.y);
     }
 
     #[test]
