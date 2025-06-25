@@ -78,6 +78,7 @@ enum MapError {
     NoGuard,
 }
 
+#[derive(Debug)]
 struct Map {
     grid: Vec<Vec<Tile>>,
     completed: bool,
@@ -230,6 +231,9 @@ impl Map {
     fn solve(&mut self) -> u16 {
         while !self.completed {
             self.step();
+            if self.guard.looped {
+                self.completed = true;
+            }
         }
         self.positions_visited
     }
@@ -493,15 +497,14 @@ mod test {
     }
 
     #[test]
-    fn test_map_step() {
-        let grid = vec![
+    fn test_map_step_rotate() {
+        //test that the step method rotates as expected
+        let start_grid = vec![
             vec!['.', '#', '.'],
             vec!['.', '^', '#'],
             vec!['.', '.', '.'],
         ];
-        let mut map = Map::new(grid);
-
-        map.step();
+        let mut map = Map::new(start_grid);
 
         let expected_grid = Map::from_char_grid(vec![
             vec!['.', '#', '.'],
@@ -520,35 +523,22 @@ mod test {
         let expected_completed = false;
         let expected_positions_visited = 1;
 
+        map.step();
+
         assert_eq!(expected_grid, map.grid);
         assert_eq!(expected_guard, map.guard);
         assert_eq!(expected_completed, map.completed);
         assert_eq!(expected_positions_visited, map.positions_visited);
+    }
 
-        map.step();
-
-        let expected_grid = Map::from_char_grid(vec![
+    #[test]
+    fn test_map_step_walk() {
+        let start_grid = vec![
             vec!['.', '#', '.'],
             vec!['.', 'v', '#'],
             vec!['.', '.', '.'],
-        ]);
-        let mut expected_guard = Guard::new(1, 1, Direction::Down);
-        let expected_completed = false;
-        let expected_positions_visited = 1;
-        let prev_pos = Position {
-            x: 1,
-            y: 1,
-            direction: Direction::Right,
-        };
-        clean_history.insert(prev_pos);
-        expected_guard.history = clean_history.clone();
-
-        assert_eq!(expected_grid, map.grid);
-        assert_eq!(expected_guard, map.guard);
-        assert_eq!(expected_completed, map.completed);
-        assert_eq!(expected_positions_visited, map.positions_visited);
-
-        map.step();
+        ];
+        let mut map = Map::new(start_grid);
 
         let expected_grid = Map::from_char_grid(vec![
             vec!['.', '#', '.'],
@@ -556,43 +546,120 @@ mod test {
             vec!['.', 'v', '.'],
         ]);
         let mut expected_guard = Guard::new(1, 2, Direction::Down);
-        let expected_completed = false;
-        let expected_positions_visited = 2;
         let prev_pos = Position {
             x: 1,
             y: 1,
             direction: Direction::Down,
         };
+        let mut clean_history = HashSet::new();
         clean_history.insert(prev_pos);
         expected_guard.history = clean_history.clone();
+        let expected_completed = false;
+        let expected_positions_visited = 2;
+
+        map.step();
 
         assert_eq!(expected_grid, map.grid);
         assert_eq!(expected_guard, map.guard);
         assert_eq!(expected_completed, map.completed);
         assert_eq!(expected_positions_visited, map.positions_visited);
+    }
+
+    #[test]
+    fn test_map_step_stores_history() {
+        let start_grid = vec![
+            vec!['.', '#', '.'],
+            vec!['>', '.', '#'],
+            vec!['.', '.', '.'],
+        ];
+        let mut map = Map::new(start_grid);
+
+        let first_pos = Position {
+            x: 0,
+            y: 1,
+            direction: Direction::Right,
+        };
+        let second_pos = Position {
+            x: 1,
+            y: 1,
+            direction: Direction::Right,
+        };
+        let third_pos = Position {
+            x: 1,
+            y: 1,
+            direction: Direction::Down,
+        };
+        let fourth_pos = Position {
+            x: 1,
+            y: 2,
+            direction: Direction::Down,
+        };
+        let mut clean_history = HashSet::new();
+        clean_history.insert(first_pos);
+        clean_history.insert(second_pos);
+        clean_history.insert(third_pos);
+        clean_history.insert(fourth_pos);
 
         map.step();
+        map.step();
+        map.step();
+        map.step();
+
+        assert_eq!(clean_history, map.guard.history);
+    }
+
+    #[test]
+    fn test_map_step_finish() {
+        let start_grid = vec![
+            vec!['.', '#', '.'],
+            vec!['.', '.', '#'],
+            vec!['.', 'v', '.'],
+        ];
+        let mut map = Map::new(start_grid);
 
         let expected_grid = Map::from_char_grid(vec![
             vec!['.', '#', '.'],
-            vec!['.', 'X', '#'],
+            vec!['.', '.', '#'],
             vec!['.', 'X', '.'],
         ]);
         let mut expected_guard = Guard::new(1, 2, Direction::Down);
-        let expected_completed = true;
-        let expected_positions_visited = 2;
         let prev_pos = Position {
             x: 1,
             y: 2,
             direction: Direction::Down,
         };
+        let mut clean_history = HashSet::new();
         clean_history.insert(prev_pos);
         expected_guard.history = clean_history.clone();
+        let expected_completed = true;
+        let expected_positions_visited = 1;
+
+        map.step();
 
         assert_eq!(expected_grid, map.grid);
         assert_eq!(expected_guard, map.guard);
         assert_eq!(expected_completed, map.completed);
         assert_eq!(expected_positions_visited, map.positions_visited);
+    }
+
+    #[test]
+    fn test_map_step_looped() {
+        let start_grid = vec![
+            vec!['.', '#', '.'],
+            vec!['#', '^', '#'],
+            vec!['.', '#', '.'],
+        ];
+        let mut map = Map::new(start_grid);
+
+        map.step();
+        assert!(!map.guard.looped);
+        map.step();
+        assert!(!map.guard.looped);
+        map.step();
+        assert!(!map.guard.looped);
+        map.step();
+
+        assert!(map.guard.looped);
     }
 
     #[test]
@@ -647,6 +714,8 @@ mod test {
         let mut map = Map::new(grid);
         let expected_solved = 2;
         assert_eq!(expected_solved, map.solve());
+        assert!(!map.guard.looped);
+        assert!(map.completed);
 
         let grid = vec![
             vec!['.', '#', '.'],
@@ -657,5 +726,22 @@ mod test {
         let mut map = Map::new(grid);
         let expected_solved = 4;
         assert_eq!(expected_solved, map.solve());
+        assert!(!map.guard.looped);
+        assert!(map.completed);
+    }
+
+    #[test]
+    fn test_map_solve_looped() {
+        let grid = vec![
+            vec!['.', '#', '.'],
+            vec!['#', '^', '#'],
+            vec!['.', '#', '.'],
+        ];
+
+        let mut map = Map::new(grid);
+        let expected_solved = 1;
+        assert_eq!(expected_solved, map.solve());
+        assert!(map.guard.looped);
+        assert!(map.completed);
     }
 }
