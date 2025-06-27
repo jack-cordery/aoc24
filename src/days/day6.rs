@@ -78,7 +78,7 @@ enum MapError {
     NoGuard,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Map {
     grid: Vec<Vec<Tile>>,
     completed: bool,
@@ -237,6 +237,34 @@ impl Map {
         }
         self.positions_visited
     }
+
+    fn check_looped(&self) -> bool {
+        // will return whether this map results in a loop
+        let mut map_clone = self.clone();
+
+        map_clone.solve();
+
+        map_clone.guard.looped
+    }
+
+    fn find_loop_obstacle_pos(&self) -> u16 {
+        // will iterate through putting a obstacle at all open positions and
+        // return the number of configs for which that results in a loop
+
+        let mut result = 0;
+        for (i, row) in self.grid.iter().enumerate() {
+            for (j, tile) in row.iter().enumerate() {
+                if tile == &Tile::Open {
+                    let mut map_clone = self.clone();
+                    map_clone.grid[i][j] = Tile::Obstacle;
+                    if map_clone.check_looped() {
+                        result += 1;
+                    }
+                }
+            }
+        }
+        result
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -246,7 +274,7 @@ struct Position {
     direction: Direction,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 struct Guard {
     position: Position,
     history: HashSet<Position>,
@@ -297,10 +325,13 @@ pub fn day_six(path: &str) -> std::io::Result<()> {
         .map(|l| l.unwrap().chars().collect())
         .collect();
     let mut map = Map::new(grid);
+    let map_clone = map.clone();
     let unique_pos = map.solve();
+    let num_pos = map_clone.find_loop_obstacle_pos();
     println!(
-        "unique postions {} in {}us",
+        "unique postions {} and num_obstacles {} in {}us",
         unique_pos,
+        num_pos,
         now.elapsed().as_micros(),
     );
     map.print_map();
@@ -743,5 +774,60 @@ mod test {
         assert_eq!(expected_solved, map.solve());
         assert!(map.guard.looped);
         assert!(map.completed);
+    }
+
+    #[test]
+    fn test_map_check_looped() {
+        let grid = vec![
+            vec!['.', '#', '.'],
+            vec!['#', '^', '#'],
+            vec!['.', '#', '.'],
+        ];
+        let grid_not = vec![
+            vec!['.', '.', '.'],
+            vec!['#', '^', '#'],
+            vec!['.', '#', '.'],
+        ];
+
+        let map = Map::new(grid);
+        let is_looped = map.check_looped();
+        assert!(is_looped);
+
+        let map = Map::new(grid_not);
+        let is_looped = map.check_looped();
+        assert!(!is_looped);
+    }
+
+    #[test]
+    fn test_map_find_loop_obstacle_pos() {
+        let grid = vec![
+            vec!['.', '.', '.'],
+            vec!['#', '^', '#'],
+            vec!['.', '#', '.'],
+        ];
+
+        let map = Map::new(grid);
+        let pos = map.find_loop_obstacle_pos();
+        assert_eq!(1, pos);
+    }
+
+    #[test]
+    fn test_map_find_loop_obstacle_pos_full() {
+        let grid = vec![
+            vec!['.', '.', '.', '.', '#', '.', '.', '.', '.', '.', '.', '.'],
+            vec!['.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '#'],
+            vec!['.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],
+            vec!['.', '.', '#', '.', '.', '.', '.', '.', '.', '.', '.', '.'],
+            vec!['.', '.', '.', '.', '.', '.', '.', '.', '.', '#', '.', '.'],
+            vec!['.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],
+            vec!['.', '#', '.', '.', '^', '.', '.', '.', '.', '.', '.', '.'],
+            vec!['.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '#', '.'],
+            vec!['#', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],
+            vec!['.', '.', '.', '.', '.', '.', '.', '.', '#', '.', '.', '.'],
+        ];
+
+        let map = Map::new(grid);
+        let pos = map.find_loop_obstacle_pos();
+        assert_eq!(6, pos);
     }
 }
