@@ -19,10 +19,12 @@
 // finally we just sum all of the valid equation values
 //
 
-#[derive(Debug, PartialEq, Eq)]
+use std::{fs::read, io::BufRead, time::Instant};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Equation {
-    value: u16,
-    numbers: Vec<u16>,
+    value: u64,
+    numbers: Vec<u64>,
     operators: Vec<Operators>,
     valid: Validity,
 }
@@ -33,7 +35,7 @@ enum Operators {
     Multiplication,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Validity {
     True,
     False,
@@ -50,7 +52,7 @@ impl Operators {
 }
 
 impl Equation {
-    pub fn new(value: u16, numbers: Vec<u16>, operators: Vec<Operators>) -> Self {
+    pub fn new(value: u64, numbers: Vec<u64>, operators: Vec<Operators>) -> Self {
         let valid = Validity::Unchecked;
         Equation {
             value,
@@ -89,7 +91,7 @@ impl Equation {
     }
 }
 
-fn get_all_equations(value: u16, numbers: Vec<u16>, all_operators: &[Operators]) -> Vec<Equation> {
+fn get_all_equations(value: u64, numbers: Vec<u64>, all_operators: &[Operators]) -> Vec<Equation> {
     let l = numbers.len();
     let mut operator_combos: Vec<Vec<Operators>> = Vec::new();
     for _ in 0..l - 1 {
@@ -128,11 +130,54 @@ fn get_operator_combos(
     result.collect()
 }
 
-fn get_total_sum_of_valid_equations(equations: Vec<Equation>) -> u16 {
-    equations
+fn check_equation_set(equation_set: Vec<Equation>) -> bool {
+    for eq in equation_set {
+        if eq.check_valid() {
+            return true;
+        }
+    }
+    false
+}
+
+fn get_total_sum_of_valid_equations(equation_sets: Vec<Vec<Equation>>) -> u64 {
+    equation_sets
         .iter()
-        .map(|e| if e.check_valid() { e.value } else { 0 })
+        .map(|e| {
+            if check_equation_set(e.to_vec()) {
+                e.first().unwrap().value
+            } else {
+                0
+            }
+        })
         .sum()
+}
+
+pub fn day_seven(path: &str) -> std::io::Result<()> {
+    let now = Instant::now();
+    let content = read(path)?;
+    let all_ops = vec![Operators::Addition, Operators::Multiplication];
+    let equation_sets: Vec<Vec<Equation>> = content
+        .lines()
+        .map(|l| {
+            let binding = l.unwrap();
+            let (value_str, eq_str) = binding.split_once(": ").unwrap();
+            println!("value is {}", value_str);
+            let value: u64 = value_str.parse::<u64>().unwrap();
+            let eq: Vec<u64> = eq_str
+                .trim_end()
+                .split(" ")
+                .map(|s| s.parse().unwrap())
+                .collect();
+            get_all_equations(value, eq, &all_ops)
+        })
+        .collect();
+    let total_sum = get_total_sum_of_valid_equations(equation_sets);
+    println!(
+        "the total sum from the data is {} and it was calculated in {}",
+        total_sum,
+        now.elapsed().as_micros()
+    );
+    Ok(())
 }
 
 #[cfg(test)]
@@ -183,11 +228,45 @@ mod test {
     }
 
     #[test]
-    fn test_total_sum_of_valid_equations() {
+    fn test_check_equation_set_zero() {
+        let all_ops = vec![Operators::Addition, Operators::Multiplication];
+        let equation_set = get_all_equations(100, vec![1, 2, 3], &all_ops);
+
+        let check = check_equation_set(equation_set);
+        assert!(!check)
+    }
+
+    #[test]
+    fn test_check_equation_set_first() {
+        let all_ops = vec![Operators::Addition, Operators::Multiplication];
+        let equation_set = get_all_equations(3267, vec![81, 40, 27], &all_ops);
+        let check = check_equation_set(equation_set);
+        assert!(check)
+    }
+
+    #[test]
+    fn test_total_sum_of_valid_equations_zero() {
         let all_ops = vec![Operators::Addition, Operators::Multiplication];
         let equations = get_all_equations(100, vec![1, 2, 3], &all_ops);
-        let sum = get_total_sum_of_valid_equations(equations);
+        let sum = get_total_sum_of_valid_equations(vec![equations]);
         assert_eq!(0, sum);
+    }
+
+    #[test]
+    fn test_total_sum_of_valid_equations_base() {
+        let all_ops = vec![Operators::Addition, Operators::Multiplication];
+        let equations = get_all_equations(190, vec![10, 19], &all_ops);
+        let sum = get_total_sum_of_valid_equations(vec![equations]);
+        assert_eq!(190, sum);
+    }
+
+    #[test]
+    fn test_total_sum_of_valid_equations_multi() {
+        let all_ops = vec![Operators::Addition, Operators::Multiplication];
+        let equations = get_all_equations(190, vec![10, 19], &all_ops);
+        let equations_second = get_all_equations(3267, vec![81, 40, 27], &all_ops);
+        let sum = get_total_sum_of_valid_equations(vec![equations, equations_second]);
+        assert_eq!(190 + 3267, sum);
     }
 
     #[test]
