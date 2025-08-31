@@ -33,6 +33,7 @@ struct Equation {
 enum Operators {
     Addition,
     Multiplication,
+    Concatination,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,6 +48,7 @@ impl Operators {
         match self {
             Operators::Addition => '+',
             Operators::Multiplication => '*',
+            Operators::Concatination => 'c',
         }
     }
 }
@@ -73,11 +75,40 @@ impl Equation {
         print!("{last_num} = {value}");
     }
 
+    fn resolve_concatinations(&mut self) {
+        let mut corrector = 0;
+        for (pos, op) in self.operators.clone().iter().enumerate() {
+            match op {
+                Operators::Concatination => {
+                    // concatinate left and right at that position
+                    // TODO: Make this work properly using comprehensive tests
+                    let left = self.numbers[pos - corrector];
+                    let right = self.numbers[pos + 1 - corrector];
+
+                    let new_str = left.to_string() + &right.to_string();
+                    let new = new_str.parse::<u64>().unwrap();
+                    self.operators.remove(pos - corrector);
+                    self.numbers.remove(pos + 1 - corrector);
+                    self.numbers[pos - corrector] = new;
+                    corrector += 1;
+                }
+                _ => {
+                    // do nothing
+                    continue;
+                }
+            }
+        }
+    }
+
     fn check_valid(&self) -> bool {
-        let mut result = *self.numbers.first().unwrap();
-        let mut num_iter = self.numbers.iter();
+        let mut cloned_self = self.clone();
+        cloned_self.resolve_concatinations();
+        println!("\nresolved eq...");
+        cloned_self.print_with_operators();
+        let mut result = *cloned_self.numbers.first().unwrap();
+        let mut num_iter = cloned_self.numbers.iter();
         num_iter.next();
-        for (num, op) in num_iter.zip(self.operators.clone()) {
+        for (num, op) in num_iter.zip(cloned_self.operators.clone()) {
             match op {
                 Operators::Addition => {
                     result += *num;
@@ -85,8 +116,12 @@ impl Equation {
                 Operators::Multiplication => {
                     result *= *num;
                 }
+                Operators::Concatination => {
+                    panic!("must evaluate concatinations before sum");
+                }
             }
         }
+        println!("result {}", result);
         result == self.value
     }
 }
@@ -144,8 +179,12 @@ fn get_total_sum_of_valid_equations(equation_sets: Vec<Vec<Equation>>) -> u64 {
         .iter()
         .map(|e| {
             if check_equation_set(e.to_vec()) {
+                println!("valid");
+                println!("{:?}", e.first().unwrap().numbers.clone());
                 e.first().unwrap().value
             } else {
+                println!("not valid");
+                println!("{:?}", e.first().unwrap().numbers.clone());
                 0
             }
         })
@@ -155,13 +194,16 @@ fn get_total_sum_of_valid_equations(equation_sets: Vec<Vec<Equation>>) -> u64 {
 pub fn day_seven(path: &str) -> std::io::Result<()> {
     let now = Instant::now();
     let content = read(path)?;
-    let all_ops = vec![Operators::Addition, Operators::Multiplication];
+    let all_ops = vec![
+        Operators::Addition,
+        Operators::Multiplication,
+        Operators::Concatination,
+    ];
     let equation_sets: Vec<Vec<Equation>> = content
         .lines()
         .map(|l| {
             let binding = l.unwrap();
             let (value_str, eq_str) = binding.split_once(": ").unwrap();
-            println!("value is {}", value_str);
             let value: u64 = value_str.parse::<u64>().unwrap();
             let eq: Vec<u64> = eq_str
                 .trim_end()
@@ -193,6 +235,18 @@ mod test {
         let invalid_equation = Equation::new(100, vec![10, 10, 0], invalid_operators);
         assert!(valid_equation.check_valid());
         assert!(!invalid_equation.check_valid());
+    }
+
+    #[test]
+    fn test_equation_check_valid_concatination() {
+        let valid_operators = vec![
+            Operators::Multiplication,
+            Operators::Concatination,
+            Operators::Multiplication,
+        ];
+
+        let valid_equation = Equation::new(7290, vec![6, 8, 6, 15], valid_operators);
+        assert!(valid_equation.check_valid());
     }
 
     #[test]
@@ -234,6 +288,19 @@ mod test {
 
         let check = check_equation_set(equation_set);
         assert!(!check)
+    }
+
+    #[test]
+    fn test_check_equation_set_complex() {
+        let all_ops = vec![
+            Operators::Addition,
+            Operators::Multiplication,
+            Operators::Concatination,
+        ];
+        let equation_set = get_all_equations(7290, vec![6, 8, 6, 15], &all_ops);
+        equation_set.iter().for_each(|e| e.print_with_operators());
+        let check = check_equation_set(equation_set);
+        assert!(check)
     }
 
     #[test]
@@ -290,5 +357,18 @@ mod test {
         ];
 
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_resolve_concatination() {
+        let mut equation = Equation::new(
+            100,
+            vec![1, 2, 3],
+            vec![Operators::Addition, Operators::Concatination],
+        );
+        equation.resolve_concatinations();
+
+        assert_eq!(equation.numbers, vec![1, 23]);
+        assert_eq!(equation.operators, vec![Operators::Addition]);
     }
 }
