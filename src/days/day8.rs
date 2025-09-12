@@ -128,14 +128,9 @@ impl Map {
                     // we want to calculate the two antinode positions
                     // to do that we need to calculate the delta x, delta y
                     // just check theyre in bounds
-                    // TODO: Fix the calculation of new x and new y
-                    // its actually that the point with the bigger x
-                    // gets x added to and the point with the bigger y
-                    // gets added to
+                    // Figure out why i get 298 and they get 299
 
                     let (pos_a, pos_other) = (a, other);
-
-                    println!("antenna pair found at {:?} {:?} ", pos_a, pos_other);
 
                     let delta_x = pos_a.x as i32 - pos_other.x as i32;
                     let delta_y = pos_a.y as i32 - pos_other.y as i32;
@@ -147,11 +142,6 @@ impl Map {
                     let (second_x, second_y) = (
                         pos_other.x as i32 + 2 * delta_x,
                         pos_other.y as i32 + 2 * delta_y,
-                    );
-
-                    println!(
-                        "first antinode {:?} {:?} with deltas {} {}",
-                        first_x, first_y, delta_x, delta_y
                     );
 
                     if (first_x < self.size.width.try_into().unwrap())
@@ -169,7 +159,6 @@ impl Map {
                             Some(Tiles::Antenna(t)) => Tiles::Overlapping(*t),
                             None => panic!("Unexpected position"),
                         };
-                        println!("updating first with {:?}", updated_tile);
                         self.grid.insert(
                             Position {
                                 x: first_x.try_into().unwrap(),
@@ -178,11 +167,6 @@ impl Map {
                             updated_tile,
                         );
                     }
-
-                    println!(
-                        "second antinode {:?} {:?} with deltas {} {}",
-                        second_x, second_y, delta_x, delta_y
-                    );
 
                     if (second_x < self.size.width.try_into().unwrap())
                         && (second_x >= 0)
@@ -199,7 +183,6 @@ impl Map {
                             Some(Tiles::Antenna(t)) => Tiles::Overlapping(*t),
                             None => panic!("Unexpected position"),
                         };
-                        println!("updating second with {:?}", updated_tile);
                         self.grid.insert(
                             Position {
                                 x: second_x.try_into().unwrap(),
