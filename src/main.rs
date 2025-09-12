@@ -5,6 +5,7 @@ use aoc24::days::day4::day_four;
 use aoc24::days::day5::day_five;
 use aoc24::days::day6::day_six;
 use aoc24::days::day7::day_seven;
+use aoc24::days::day8::day_eight;
 use std::env;
 use std::io;
 
@@ -24,6 +25,7 @@ fn main() -> io::Result<()> {
         "day_five" => day_five(path.as_str())?,
         "day_six" => day_six(path.as_str())?,
         "day_seven" => day_seven(path.as_str())?,
+        "day_eight" => day_eight(path.as_str())?,
         _ => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
