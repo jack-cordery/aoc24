@@ -5,7 +5,6 @@
 // in a line between the two and the distance away in the opposite
 // direction. They exist as long as they are on the map
 // WE just need to calculate how many exist on the map
-//
 
 use std::{collections::HashMap, fs::read, io::BufRead, time::Instant};
 
@@ -37,17 +36,12 @@ enum Tiles {
     Overlapping(char),
 }
 
-#[derive(Debug)]
-enum TileError {
-    InvalidInputTile,
-}
-
 impl Tiles {
-    fn from_char(c: char) -> std::result::Result<Self, TileError> {
+    fn from_char(c: char) -> Self {
         match c {
-            '.' => Ok(Self::Empty),
-            '#' => Ok(Self::Antinode),
-            c => Ok(Self::Antenna(c)),
+            '.' => Self::Empty,
+            '#' => Self::Antinode,
+            c => Self::Antenna(c),
         }
     }
 }
@@ -61,10 +55,7 @@ impl Map {
             for (col, c) in v.iter().enumerate() {
                 let pos = Position { x: col, y: row };
                 let tile = Tiles::from_char(*c);
-                match tile {
-                    Ok(t) => hmap.insert(pos, t),
-                    Err(_) => panic!("invalid input tile"),
-                };
+                hmap.insert(pos, tile);
                 width = col;
             }
             height = row;
@@ -115,7 +106,6 @@ impl Map {
                 }
             }
         }
-        //TODO: Fix below to now use the actual proper grouped sets
         for (_, positions) in antennas_grouped.into_iter().filter(|a| {
             let (t, _) = a;
             matches!(t, Tiles::Antenna(_))
@@ -137,59 +127,61 @@ impl Map {
 
                     // i now have a delta vector which points from  other to a
                     // so now i can minus that from other and add two to other
-                    let (first_x, first_y) =
-                        (pos_other.x as i32 - delta_x, pos_other.y as i32 - delta_y);
-                    let (second_x, second_y) = (
-                        pos_other.x as i32 + 2 * delta_x,
-                        pos_other.y as i32 + 2 * delta_y,
-                    );
+                    //
+                    let mut antinode_positions: Vec<Position> = vec![];
+                    let mut oob_check = false;
+                    let mut i = 0;
 
-                    if (first_x < self.size.width.try_into().unwrap())
-                        && (first_x >= 0)
-                        && (first_y < self.size.height.try_into().unwrap())
-                        && (first_y >= 0)
-                    {
-                        let updated_tile = match self.grid.get(&Position {
-                            x: first_x.try_into().unwrap(),
-                            y: first_y.try_into().unwrap(),
-                        }) {
-                            Some(Tiles::Empty) => Tiles::Antinode,
-                            Some(Tiles::Antinode) => Tiles::Antinode,
-                            Some(Tiles::Overlapping(t)) => Tiles::Overlapping(*t),
-                            Some(Tiles::Antenna(t)) => Tiles::Overlapping(*t),
-                            None => panic!("Unexpected position"),
-                        };
-                        self.grid.insert(
-                            Position {
-                                x: first_x.try_into().unwrap(),
-                                y: first_y.try_into().unwrap(),
-                            },
-                            updated_tile,
+                    while !oob_check {
+                        let (x, y) = (
+                            pos_other.x as i32 + (delta_x * i),
+                            pos_other.y as i32 + (delta_y * i),
                         );
+                        if (x < self.size.width.try_into().unwrap())
+                            && (x >= 0)
+                            && (y < self.size.height.try_into().unwrap())
+                            && (y >= 0)
+                        {
+                            antinode_positions.push(Position {
+                                x: x as usize,
+                                y: y as usize,
+                            });
+                            i += 1;
+                        } else {
+                            oob_check = true;
+                        }
+                    }
+                    oob_check = false;
+                    i = -1;
+                    while !oob_check {
+                        let (x, y) = (
+                            pos_other.x as i32 + (delta_x * i),
+                            pos_other.y as i32 + (delta_y * i),
+                        );
+                        if (x < self.size.width.try_into().unwrap())
+                            && (x >= 0)
+                            && (y < self.size.height.try_into().unwrap())
+                            && (y >= 0)
+                        {
+                            antinode_positions.push(Position {
+                                x: x as usize,
+                                y: y as usize,
+                            });
+                            i -= 1;
+                        } else {
+                            oob_check = true;
+                        }
                     }
 
-                    if (second_x < self.size.width.try_into().unwrap())
-                        && (second_x >= 0)
-                        && (second_y < self.size.height.try_into().unwrap())
-                        && (second_y >= 0)
-                    {
-                        let updated_tile = match self.grid.get(&Position {
-                            x: second_x.try_into().unwrap(),
-                            y: second_y.try_into().unwrap(),
-                        }) {
+                    for pos in antinode_positions.iter() {
+                        let updated_tile = match self.grid.get(pos) {
                             Some(Tiles::Empty) => Tiles::Antinode,
                             Some(Tiles::Antinode) => Tiles::Antinode,
                             Some(Tiles::Overlapping(t)) => Tiles::Overlapping(*t),
                             Some(Tiles::Antenna(t)) => Tiles::Overlapping(*t),
                             None => panic!("Unexpected position"),
                         };
-                        self.grid.insert(
-                            Position {
-                                x: second_x.try_into().unwrap(),
-                                y: second_y.try_into().unwrap(),
-                            },
-                            updated_tile,
-                        );
+                        self.grid.insert(*pos, updated_tile);
                     }
                 }
             }
@@ -241,7 +233,7 @@ mod test {
         let mut map = Map::new(char_grid);
         map.find_antinodes();
         let actual = map.count_antinodes();
-        let expected = 2;
+        let expected = 4;
 
         assert_eq!(expected, actual);
     }
@@ -258,7 +250,7 @@ mod test {
         let mut map = Map::new(char_grid);
         map.find_antinodes();
         let actual = map.count_antinodes();
-        let expected = 2;
+        let expected = 6;
 
         assert_eq!(expected, actual);
     }
@@ -275,7 +267,7 @@ mod test {
         let mut map = Map::new(char_grid);
         map.find_antinodes();
         let actual = map.count_antinodes();
-        let expected = 4;
+        let expected = 7;
 
         assert_eq!(expected, actual);
     }
@@ -311,36 +303,13 @@ mod test {
     }
 
     #[test]
-    fn test_find_antinodes() {
-        let char_grid = vec![
-            vec!['.', '.', '.'],
-            vec!['.', 'd', '.'],
-            vec!['c', 'd', 'e'],
-            vec!['.', '.', '.'],
-        ];
-        let expected_grid = vec![
-            vec!['.', '#', '.'],
-            vec!['.', 'd', '.'],
-            vec!['c', 'd', 'e'],
-            vec!['.', '#', '.'],
-        ];
-
-        let mut actual = Map::new(char_grid);
-        let expected = Map::new(expected_grid);
-
-        actual.find_antinodes();
-
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
     fn test_tile_from_char() {
         let a = '.';
         let b = 'a';
         let c = '1';
 
-        assert_eq!(Tiles::from_char(a).unwrap(), Tiles::Empty);
-        assert_eq!(Tiles::from_char(b).unwrap(), Tiles::Antenna('a'));
-        assert_eq!(Tiles::from_char(c).unwrap(), Tiles::Antenna('1'));
+        assert_eq!(Tiles::from_char(a), Tiles::Empty);
+        assert_eq!(Tiles::from_char(b), Tiles::Antenna('a'));
+        assert_eq!(Tiles::from_char(c), Tiles::Antenna('1'));
     }
 }
