@@ -22,18 +22,18 @@ use std::{fs::read, io::BufRead, iter::repeat, time::Instant};
 #[derive(Clone, PartialEq, Debug)]
 enum Bits {
     Empty,
-    Value(u8),
+    Value(u16),
 }
 
 struct Data {
-    compressed: Vec<u8>,
+    compressed: Vec<u16>,
     raw: Vec<Bits>,
     raw_reduced: Vec<Bits>,
     non_empty_count: usize,
 }
 
 impl Data {
-    pub fn new(compressed: Vec<u8>) -> Self {
+    pub fn new(compressed: Vec<u16>) -> Self {
         Data {
             compressed,
             raw: vec![],
@@ -51,7 +51,7 @@ impl Data {
             self.non_empty_count += block_length as usize;
             let free_length = if j == n { 0 } else { self.compressed[j + 1] };
             result.extend(std::iter::repeat_n(
-                Bits::Value(i as u8),
+                Bits::Value(i as u16),
                 block_length as usize,
             ));
             result.extend(std::iter::repeat_n(Bits::Empty, free_length as usize));
@@ -88,7 +88,7 @@ impl Data {
         self.raw_reduced = reduced;
     }
 
-    pub fn get_checksum(&self) -> u32 {
+    pub fn get_checksum(&self) -> u64 {
         // so now we just want to take reduced raw and
         // calculate sum(pos * val)
         let mut sum = 0;
@@ -100,7 +100,7 @@ impl Data {
         {
             let val = match v {
                 Bits::Empty => 0,
-                Bits::Value(x) => *x as u32 * i as u32,
+                Bits::Value(x) => *x as u64 * i as u64,
             };
             sum += val;
         }
@@ -111,10 +111,10 @@ impl Data {
 pub fn day_nine(path: &str) -> std::io::Result<()> {
     let now = Instant::now();
     let content = std::fs::read_to_string(path).unwrap();
-    let digits: Vec<u8> = content
+    let digits: Vec<u16> = content
         .chars()
         .filter_map(|s| s.to_digit(10))
-        .map(|d| d as u8)
+        .map(|d| d as u16)
         .collect();
 
     let mut x = Data::new(digits);
