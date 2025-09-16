@@ -1,4 +1,4 @@
-use std::iter::repeat;
+use std::{fs::read, io::BufRead, iter::repeat, time::Instant};
 
 // so we are given some kind of compressed data
 // that represent larger data
@@ -29,6 +29,7 @@ struct Data {
     compressed: Vec<u8>,
     raw: Vec<Bits>,
     raw_reduced: Vec<Bits>,
+    non_empty_count: usize,
 }
 
 impl Data {
@@ -37,6 +38,7 @@ impl Data {
             compressed,
             raw: vec![],
             raw_reduced: vec![],
+            non_empty_count: 0,
         }
     }
     pub fn expand(&mut self) {
@@ -44,8 +46,9 @@ impl Data {
         // struct
         let n = self.compressed.len() - 1;
         let mut result: Vec<Bits> = vec![];
-        for (i, j) in (0..n).step_by(2).enumerate() {
+        for (i, j) in (0..n + 1).step_by(2).enumerate() {
             let block_length = self.compressed[j];
+            self.non_empty_count += block_length as usize;
             let free_length = if j == n { 0 } else { self.compressed[j + 1] };
             result.extend(std::iter::repeat_n(
                 Bits::Value(i as u8),
@@ -55,6 +58,77 @@ impl Data {
         }
         self.raw = result;
     }
+    pub fn reduce_raw(&mut self) {
+        // this will take the raw value and reduce it so that there are no
+        // empty gaps between values
+        // basic plan is to iterate through from left to right until non_empty_count
+        // and swap the right most non_empty point with the left most empty
+        let mut left = 0;
+        let mut right = self.raw.len() - 1;
+        let mut reduced = self.raw.clone();
+        while left < self.non_empty_count {
+            let mut v = &self.raw[left];
+            while v != &Bits::Empty {
+                left += 1;
+                v = &reduced[left];
+            }
+
+            let mut w = &reduced[right];
+            while w == &Bits::Empty {
+                right -= 1;
+                w = &reduced[right];
+            }
+            if left < self.non_empty_count {
+                // swap left and right
+                reduced.swap(left, right);
+                left += 1;
+                right -= 1;
+            }
+        }
+        self.raw_reduced = reduced;
+    }
+
+    pub fn get_checksum(&self) -> u32 {
+        // so now we just want to take reduced raw and
+        // calculate sum(pos * val)
+        let mut sum = 0;
+        for (i, v) in self
+            .raw_reduced
+            .iter()
+            .enumerate()
+            .take(self.non_empty_count)
+        {
+            let val = match v {
+                Bits::Empty => 0,
+                Bits::Value(x) => *x as u32 * i as u32,
+            };
+            sum += val;
+        }
+        sum
+    }
+}
+
+pub fn day_nine(path: &str) -> std::io::Result<()> {
+    let now = Instant::now();
+    let content = std::fs::read_to_string(path).unwrap();
+    let digits: Vec<u8> = content
+        .chars()
+        .filter_map(|s| s.to_digit(10))
+        .map(|d| d as u8)
+        .collect();
+
+    let mut x = Data::new(digits);
+
+    x.expand();
+    x.reduce_raw();
+    let checksum = x.get_checksum();
+
+    println!(
+        "the checksum is {} and was calculated in {} us",
+        checksum,
+        now.elapsed().as_micros()
+    );
+    Ok(())
 }
 
 #[cfg(test)]
@@ -68,6 +142,7 @@ mod test {
         data.expand();
         let expected = [
             Bits::Value(0),
+            Bits::Empty,
             Bits::Empty,
             Bits::Value(1),
             Bits::Value(1),
@@ -83,5 +158,43 @@ mod test {
             Bits::Value(2),
         ];
         assert_eq!(data.raw, expected);
+        assert_eq!(data.non_empty_count, 9);
+    }
+
+    #[test]
+    fn test_data_reduce_raw() {
+        let input = vec![1, 2, 3, 4, 5];
+        let mut data = Data::new(input);
+        data.expand();
+        data.reduce_raw();
+        let expected = [
+            Bits::Value(0),
+            Bits::Value(2),
+            Bits::Value(2),
+            Bits::Value(1),
+            Bits::Value(1),
+            Bits::Value(1),
+            Bits::Value(2),
+            Bits::Value(2),
+            Bits::Value(2),
+            Bits::Empty,
+            Bits::Empty,
+            Bits::Empty,
+            Bits::Empty,
+            Bits::Empty,
+            Bits::Empty,
+        ];
+        assert_eq!(data.raw_reduced, expected);
+    }
+
+    #[test]
+    fn test_data_get_checksum() {
+        let input = vec![1, 2, 3, 4, 5];
+        let mut data = Data::new(input);
+        data.expand();
+        data.reduce_raw();
+        let actual = data.get_checksum();
+        let expected = 60;
+        assert_eq!(actual, expected);
     }
 }
