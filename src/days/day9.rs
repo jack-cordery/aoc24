@@ -25,10 +25,20 @@ enum Bits {
     Value(u16),
 }
 
+#[derive(Clone, PartialEq, Debug)]
+struct Block {
+    value: Bits,
+    length: usize,
+    start_pos: usize,
+    moved: bool,
+}
+
 struct Data {
     compressed: Vec<u16>,
     raw: Vec<Bits>,
     raw_reduced: Vec<Bits>,
+    empty_blocks: Vec<Block>,
+    value_blocks: Vec<Block>,
     non_empty_count: usize,
 }
 
@@ -38,6 +48,8 @@ impl Data {
             compressed,
             raw: vec![],
             raw_reduced: vec![],
+            empty_blocks: vec![],
+            value_blocks: vec![],
             non_empty_count: 0,
         }
     }
@@ -57,6 +69,59 @@ impl Data {
             result.extend(std::iter::repeat_n(Bits::Empty, free_length as usize));
         }
         self.raw = result;
+    }
+
+    pub fn d9p2(self) -> u64 {
+        // so this time we want to take the right most, unattempted value block
+        // and try to move it to the left most empty block. Attempt a move for each block
+        // only once
+        // so this should convert a compressed file to a raw and store it in the
+        // struct
+        let n = self.compressed.len() - 1;
+        let mut empty_blocks: Vec<Block> = vec![];
+        let mut value_blocks: Vec<Block> = vec![];
+        let mut pos_counter = 0;
+        for (i, j) in (0..n + 1).step_by(2).enumerate() {
+            let new_block = Block {
+                value: Bits::Value(i as u16),
+                length: self.compressed[j] as usize,
+                start_pos: pos_counter,
+                moved: false,
+            };
+            value_blocks.push(new_block);
+            pos_counter += self.compressed[j] as usize;
+            if j != n {
+                let empty_block = Block {
+                    value: Bits::Empty,
+                    length: self.compressed[j + 1] as usize,
+                    start_pos: pos_counter,
+                    moved: false,
+                };
+                empty_blocks.push(empty_block);
+                pos_counter += self.compressed[j + 1] as usize;
+            }
+        }
+
+        // ok so now i need to try and move each block from right to left to the
+        // left most empty block it can. So lets start with the rest most
+        // and go until i have tried to move them all
+        //
+        let mut right_block = value_blocks.last();
+        for v in value_blocks.iter_mut().rev() {
+            for e in empty_blocks.iter_mut() {
+                if v.length <= e.length {
+                    // move the block to that pos and change empty block to reflect
+                    // that and exit the loop
+                    //
+                    v.start_pos = e.start_pos;
+                    e.start_pos += v.length;
+                    e.length -= v.length;
+
+                    break;
+                }
+            }
+        }
+        return 20;
     }
     pub fn reduce_raw(&mut self) {
         // this will take the raw value and reduce it so that there are no
