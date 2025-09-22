@@ -126,8 +126,9 @@ impl Data {
                 Bits::Value(x) => x,
                 _ => panic!(),
             };
-            sum += (v.start_pos as u64 * (value as u64))
-                + (v.length as u64 + 1) * (v.length as u64) / 2;
+            let add = (v.start_pos as u64 - 1) * (value as u64) * (v.length as u64)
+                + (v.length as u64 + 1) * (v.length as u64) * (value as u64) / 2;
+            sum += add
         }
         sum
     }
@@ -206,8 +207,6 @@ pub fn day_nine(path: &str) -> std::io::Result<()> {
     x.get_blocks();
     x.move_blocks();
     let checksum = x.block_checksum();
-
-    println!("{:?}", &x.value_blocks);
 
     println!(
         "the checksum for p2 is {} and was calculated in {} us",
