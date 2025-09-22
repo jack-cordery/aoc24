@@ -33,6 +33,7 @@ struct Block {
     moved: bool,
 }
 
+#[derive(Clone)]
 struct Data {
     compressed: Vec<u16>,
     raw: Vec<Bits>,
@@ -71,12 +72,7 @@ impl Data {
         self.raw = result;
     }
 
-    pub fn d9p2(self) -> u64 {
-        // so this time we want to take the right most, unattempted value block
-        // and try to move it to the left most empty block. Attempt a move for each block
-        // only once
-        // so this should convert a compressed file to a raw and store it in the
-        // struct
+    pub fn get_blocks(&mut self) {
         let n = self.compressed.len() - 1;
         let mut empty_blocks: Vec<Block> = vec![];
         let mut value_blocks: Vec<Block> = vec![];
@@ -101,13 +97,13 @@ impl Data {
                 pos_counter += self.compressed[j + 1] as usize;
             }
         }
+        self.empty_blocks = empty_blocks;
+        self.value_blocks = value_blocks;
+    }
 
-        // ok so now i need to try and move each block from right to left to the
-        // left most empty block it can. So lets start with the rest most
-        // and go until i have tried to move them all
-        //
-        for v in value_blocks.iter_mut().rev() {
-            for e in empty_blocks.iter_mut() {
+    pub fn move_blocks(&mut self) {
+        for v in self.value_blocks.iter_mut().rev() {
+            for e in self.empty_blocks.iter_mut() {
                 if v.length <= e.length {
                     // move the block to that pos and change empty block to reflect
                     // that and exit the loop
@@ -115,22 +111,27 @@ impl Data {
                     v.start_pos = e.start_pos;
                     e.start_pos += v.length;
                     e.length -= v.length;
+                    v.moved = true;
 
                     break;
                 }
             }
         }
+    }
 
+    pub fn block_checksum(&self) -> u64 {
         let mut sum = 0;
-        for v in value_blocks.iter() {
+        for v in self.value_blocks.iter() {
             let value = match v.value {
                 Bits::Value(x) => x,
                 _ => panic!(),
             };
-            sum += (v.start_pos * (value as usize)) + (v.length + 1) * (v.length) / 2;
+            sum += (v.start_pos as u64 * (value as u64))
+                + (v.length as u64 + 1) * (v.length as u64) / 2;
         }
-        sum as u64
+        sum
     }
+
     pub fn reduce_raw(&mut self) {
         // this will take the raw value and reduce it so that there are no
         // empty gaps between values
@@ -198,6 +199,18 @@ pub fn day_nine(path: &str) -> std::io::Result<()> {
 
     println!(
         "the checksum is {} and was calculated in {} us",
+        checksum,
+        now.elapsed().as_micros()
+    );
+
+    x.get_blocks();
+    x.move_blocks();
+    let checksum = x.block_checksum();
+
+    println!("{:?}", &x.value_blocks);
+
+    println!(
+        "the checksum for p2 is {} and was calculated in {} us",
         checksum,
         now.elapsed().as_micros()
     );
