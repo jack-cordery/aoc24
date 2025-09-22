@@ -106,7 +106,6 @@ impl Data {
         // left most empty block it can. So lets start with the rest most
         // and go until i have tried to move them all
         //
-        let mut right_block = value_blocks.last();
         for v in value_blocks.iter_mut().rev() {
             for e in empty_blocks.iter_mut() {
                 if v.length <= e.length {
@@ -121,7 +120,16 @@ impl Data {
                 }
             }
         }
-        return 20;
+
+        let mut sum = 0;
+        for v in value_blocks.iter() {
+            let value = match v.value {
+                Bits::Value(x) => x,
+                _ => panic!(),
+            };
+            sum += (v.start_pos * (value as usize)) + (v.length + 1) * (v.length) / 2;
+        }
+        sum as u64
     }
     pub fn reduce_raw(&mut self) {
         // this will take the raw value and reduce it so that there are no
