@@ -103,19 +103,34 @@ impl Data {
 
     pub fn move_blocks(&mut self) {
         for v in self.value_blocks.iter_mut().rev() {
+            let mut is_moved = false;
+            let mut old_start = 0;
             for e in self.empty_blocks.iter_mut() {
-                if v.length <= e.length {
+                if v.length <= e.length && v.start_pos > e.start_pos {
                     // move the block to that pos and change empty block to reflect
                     // that and exit the loop
                     //
+                    old_start = v.start_pos;
                     v.start_pos = e.start_pos;
                     e.start_pos += v.length;
                     e.length -= v.length;
                     v.moved = true;
+                    is_moved = true;
 
                     break;
                 }
             }
+            if is_moved {
+                let new_empty = Block {
+                    value: Bits::Empty,
+                    length: v.length,
+                    start_pos: old_start,
+                    moved: false,
+                };
+                self.empty_blocks.push(new_empty);
+            }
+            self.empty_blocks.retain(|e| e.length > 0);
+            self.empty_blocks = merge_adjacent_blocks(self.empty_blocks.clone());
         }
     }
 
@@ -181,6 +196,28 @@ impl Data {
         }
         sum
     }
+}
+fn merge_adjacent_blocks(blocks: Vec<Block>) -> Vec<Block> {
+    let mut blocks = blocks.into_iter().collect::<Vec<_>>();
+
+    blocks.sort_by_key(|b| b.start_pos);
+
+    let mut merged: Vec<Block> = Vec::new();
+
+    for block in blocks {
+        if let Some(last) = merged.last_mut() {
+            if block.start_pos <= last.start_pos + last.length {
+                let new_end = (block.start_pos + block.length).max(last.start_pos + last.length);
+                last.length = new_end - last.start_pos;
+            } else {
+                merged.push(block);
+            }
+        } else {
+            merged.push(block);
+        }
+    }
+
+    merged
 }
 
 pub fn day_nine(path: &str) -> std::io::Result<()> {
