@@ -143,14 +143,14 @@ impl Map {
         }
     }
 
-    pub fn score(&self) -> u64 {
+    pub fn score(&self) -> (u64, u64) {
         let all_routes = iterate_whole_routes(self);
         let unique_routes: Vec<&Route> = all_routes
             .iter()
             .unique_by(|r| (r.positions.first().unwrap(), r.positions.last().unwrap()))
             .collect();
 
-        unique_routes.len() as u64
+        (unique_routes.len() as u64, all_routes.len() as u64)
     }
 }
 
@@ -235,8 +235,9 @@ pub fn day_ten(path: &str) -> std::io::Result<()> {
     let map = Map::read(rows);
     let score = map.score();
     println!(
-        "the score is {} and calculated in {:?}",
-        score,
+        "the score is {} and {} and calculated in {:?}",
+        score.0,
+        score.1,
         now.elapsed().as_micros()
     );
     Ok(())
@@ -451,7 +452,7 @@ mod tests {
             vec![8, 7, 6, 5],
             vec![9, 8, 7, 6],
         ]);
-        let expected = 1;
+        let expected = (1, 16);
         let actual = map.score();
 
         assert_eq!(expected, actual)
@@ -465,7 +466,7 @@ mod tests {
             vec![8, 9, 6, 5],
             vec![9, 8, 7, 6],
         ]);
-        let expected = 4;
+        let expected = (4, 16);
         let actual = map.score();
 
         assert_eq!(expected, actual)
