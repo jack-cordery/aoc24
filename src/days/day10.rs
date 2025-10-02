@@ -1,4 +1,10 @@
+use std::cmp::min;
 use std::collections::HashMap;
+use std::fs::read;
+use std::io::BufRead;
+use std::time::Instant;
+
+use itertools::Itertools;
 
 /// We are given some topographical maps that represent some height [0,9]
 /// we have a concept of a hiking trail that is a route that uses
@@ -48,7 +54,6 @@ impl Route {
                 let new_y = last_pos.y;
                 let new_pos = Position::new(new_x, new_y);
                 let next_value = map.grid.get(&new_pos).unwrap().value();
-                println!("current {} and next {}", current_value, next_value);
                 if (next_value > current_value) && (next_value - current_value == 1) {
                     result.positions.push(new_pos);
                     Ok(result)
@@ -137,6 +142,16 @@ impl Map {
             max_x: vec_grid.first().unwrap().len(),
         }
     }
+
+    pub fn score(&self) -> u64 {
+        let all_routes = iterate_whole_routes(self);
+        let unique_routes: Vec<&Route> = all_routes
+            .iter()
+            .unique_by(|r| (r.positions.first().unwrap(), r.positions.last().unwrap()))
+            .collect();
+
+        unique_routes.len() as u64
+    }
 }
 
 /// take a vector of routes and calculate the next step for each
@@ -154,6 +169,23 @@ pub fn iterate_routes(routes: Vec<Route>, map: &Map) -> Vec<Route> {
         }
     }
     result
+}
+
+/// take a map with start points and iterate until we find all of the routes
+/// that end up at an end point
+pub fn iterate_whole_routes(map: &Map) -> Vec<Route> {
+    let mut routes = map.trailheads.iter().map(|x| Route::new(*x)).collect();
+    let mut min_length = 1;
+
+    while min_length < 10 {
+        routes = iterate_routes(routes, map);
+        min_length = routes
+            .iter()
+            .map(|r| r.positions.len())
+            .reduce(|acc, e| min(e, acc))
+            .expect("possible routes");
+    }
+    routes
 }
 
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
@@ -187,6 +219,27 @@ impl Height {
     pub fn value(self) -> u8 {
         self.0
     }
+}
+
+pub fn day_ten(path: &str) -> std::io::Result<()> {
+    let now = Instant::now();
+    let content = read(path)?;
+    let data: Vec<String> = content.lines().map(|x| x.unwrap()).collect();
+    let rows: Vec<Vec<u8>> = data
+        .iter()
+        .map(|x| {
+            let dig: Vec<u8> = x.chars().map(|c| c.to_digit(10).unwrap() as u8).collect();
+            dig
+        })
+        .collect();
+    let map = Map::read(rows);
+    let score = map.score();
+    println!(
+        "the score is {} and calculated in {:?}",
+        score,
+        now.elapsed().as_micros()
+    );
+    Ok(())
 }
 
 #[cfg(test)]
@@ -338,8 +391,83 @@ mod tests {
         assert_eq!(expected, actual);
     }
 
-    // TODO:
-    // [X] Map Read
-    // [X] Route action move
-    // [] iterate steps
+    #[test]
+    fn test_iterate_step() {
+        let map = Map::read(vec![
+            vec![0, 1, 2, 3],
+            vec![1, 2, 3, 4],
+            vec![8, 7, 6, 5],
+            vec![9, 8, 7, 6],
+        ]);
+        let routes = map.trailheads.iter().map(|x| Route::new(*x)).collect();
+        let new_routes = iterate_routes(routes, &map);
+
+        let expected = vec![
+            Route {
+                positions: vec![Position::new(0, 0), Position::new(1, 0)],
+            },
+            Route {
+                positions: vec![Position::new(0, 0), Position::new(0, 1)],
+            },
+        ];
+
+        assert_eq!(expected, new_routes)
+    }
+
+    #[test]
+    fn test_iterate_all() {
+        let map = Map::read(vec![
+            vec![0, 1, 2, 3],
+            vec![0, 2, 0, 4],
+            vec![0, 0, 0, 5],
+            vec![9, 8, 7, 6],
+        ]);
+
+        let actual = iterate_whole_routes(&map);
+
+        let expected = vec![Route {
+            positions: vec![
+                Position::new(0, 0),
+                Position::new(1, 0),
+                Position::new(2, 0),
+                Position::new(3, 0),
+                Position::new(3, 1),
+                Position::new(3, 2),
+                Position::new(3, 3),
+                Position::new(2, 3),
+                Position::new(1, 3),
+                Position::new(0, 3),
+            ],
+        }];
+
+        assert_eq!(expected, actual)
+    }
+
+    #[test]
+    fn test_score() {
+        let map = Map::read(vec![
+            vec![0, 1, 2, 3],
+            vec![1, 2, 3, 4],
+            vec![8, 7, 6, 5],
+            vec![9, 8, 7, 6],
+        ]);
+        let expected = 1;
+        let actual = map.score();
+
+        assert_eq!(expected, actual)
+    }
+
+    #[test]
+    fn test_score_again() {
+        let map = Map::read(vec![
+            vec![0, 1, 2, 3],
+            vec![1, 0, 3, 4],
+            vec![8, 9, 6, 5],
+            vec![9, 8, 7, 6],
+        ]);
+        let expected = 4;
+        let actual = map.score();
+
+        assert_eq!(expected, actual)
+    }
 }
