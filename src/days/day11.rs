@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs::{read, read_to_string},
     time::Instant,
 };
@@ -17,27 +18,59 @@ use std::{
 
 /// stone represents a stone with an integer carved on it that can transform in
 /// three ways zeroToOne, Split, Multiply
-#[derive(Debug, PartialEq)]
-struct Stone(u64);
+
+#[derive(Debug, Eq, Hash, PartialEq, Clone)]
+pub struct Stone(u64);
 
 /// A line of stones which evolves on each blink into a new Line
 #[derive(Debug, PartialEq)]
-struct Line(Vec<Stone>);
+pub struct Line {
+    line: Vec<Stone>,
+    memo: HashMap<(Stone, usize), u64>,
+}
 
 impl Line {
     pub fn new(stones: Vec<u64>) -> Self {
-        Self(stones.iter().map(|n| Stone(*n)).collect())
-    }
-    pub fn evolve(&mut self) {
-        self.0 = self.0.iter().flat_map(|s| s.blink()).collect();
-    }
-    pub fn evolve_n(&mut self, n: usize) {
-        for _ in 0..n {
-            self.evolve();
+        let memo = HashMap::new();
+        Self {
+            line: stones.iter().map(|n| Stone(*n)).collect(),
+            memo,
         }
     }
 }
 
+pub fn blink_stones_n(
+    stones: Vec<Stone>,
+    n: usize,
+    memo: &mut HashMap<(Stone, usize), u64>,
+) -> u64 {
+    stones.iter().map(|s| blink_n(s.clone(), n, memo)).sum()
+}
+
+pub fn blink_n(stone: Stone, n: usize, memo: &mut HashMap<(Stone, usize), u64>) -> u64 {
+    // ok so given a stone and steps i want to recursively count the
+    // number of stones it generates
+    //
+    if n == 0 {
+        return 1;
+    }
+    if let Some(cached) = memo.get(&(stone.clone(), n)) {
+        return *cached;
+    }
+    let mut result = 0;
+
+    let stones = stone.blink();
+    if stones.len() == 1 {
+        result += blink_n(stones.first().unwrap().clone(), n - 1, memo);
+    } else {
+        result += blink_n(stones.first().unwrap().clone(), n - 1, memo)
+            + blink_n(stones.get(1).unwrap().clone(), n - 1, memo);
+    }
+
+    memo.insert((stone, n), result);
+
+    result
+}
 impl Stone {
     pub fn blink(&self) -> Vec<Self> {
         if self.0 == 0 {
@@ -82,11 +115,11 @@ pub fn day_eleven(path: &str) -> std::io::Result<()> {
     let mut line = Line::new(digits);
     println!("the line is {:?}", line);
 
-    line.evolve_n(25);
+    let result = blink_stones_n(line.line, 75, &mut line.memo);
 
     println!(
         "the score is {} and  and calculated in {:?}",
-        line.0.len(),
+        result,
         now.elapsed().as_micros()
     );
     Ok(())
@@ -113,6 +146,38 @@ mod test {
         assert_eq!(expected_even_zeros, input_even_zeros.blink());
         assert_eq!(expected_else, input_else.blink());
     }
+
+    #[test]
+    fn test_blink_n() {
+        let mut memo = HashMap::new();
+        let actual = blink_stones_n(vec![Stone(125), Stone(17)], 6, &mut memo);
+        let expected = vec![
+            Stone(2097446912),
+            Stone(14168),
+            Stone(4048),
+            Stone(2),
+            Stone(0),
+            Stone(2),
+            Stone(4),
+            Stone(40),
+            Stone(48),
+            Stone(2024),
+            Stone(40),
+            Stone(48),
+            Stone(80),
+            Stone(96),
+            Stone(2),
+            Stone(8),
+            Stone(6),
+            Stone(7),
+            Stone(6),
+            Stone(0),
+            Stone(3),
+            Stone(2),
+        ];
+        assert_eq!(expected.len() as u64, actual);
+    }
+
     #[test]
     fn test_is_even_digits() {
         let input_zero = Stone(0);
@@ -147,39 +212,13 @@ mod test {
     #[test]
     fn test_line_new() {
         let input = vec![1, 2, 3, 4];
-        let expected = Line(vec![Stone(1), Stone(2), Stone(3), Stone(4)]);
+        let expected = Line {
+            line: vec![Stone(1), Stone(2), Stone(3), Stone(4)],
+            memo: HashMap::new(),
+        };
 
         let actual = Line::new(input);
 
         assert_eq!(expected, actual);
-    }
-    #[test]
-    fn test_line_evolve() {
-        let mut line = Line::new(vec![125, 17]);
-        let expected = Line::new(vec![253000, 1, 7]);
-        let expected_second = Line::new(vec![253, 0, 2024, 14168]);
-
-        line.evolve();
-        assert_eq!(expected, line);
-        line.evolve();
-        assert_eq!(expected_second, line);
-    }
-
-    #[test]
-    fn test_line_evolve_n() {
-        let mut line = Line::new(vec![125, 17]);
-        let expected_second = Line::new(vec![253, 0, 2024, 14168]);
-
-        line.evolve_n(2);
-        assert_eq!(expected_second, line);
-    }
-
-    #[test]
-    fn test_toy() {
-        let mut line = Line::new(vec![125, 17]);
-        let expected = 55312;
-
-        line.evolve_n(25);
-        assert_eq!(expected, line.0.len());
     }
 }
