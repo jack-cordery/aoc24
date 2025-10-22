@@ -20,6 +20,7 @@ pub struct Plant {
     j: usize,
     group: Option<usize>,
     borders: Option<usize>, // this will just be number of non-group edges
+    edges: Option<usize>,
 }
 
 impl Plant {
@@ -30,6 +31,7 @@ impl Plant {
             j,
             group: None,
             borders: None,
+            edges: None,
         }
     }
 }
@@ -71,7 +73,59 @@ impl Map {
             println!();
         }
     }
+    fn count_edges(&mut self, i: usize, j: usize) {
+        // so we want to take the plant at i and j and check all the corners
+        let mut is_neighbour_left = false;
+        let max_i = self.size_i - 1;
+        let max_j = self.size_j - 1;
+        let plant_grid = self.plants.clone();
 
+        if i > 0
+            && plant_grid.get(j).unwrap().get(i).unwrap().label
+                == plant_grid.get(j).unwrap().get(i - 1).unwrap().label
+        {
+            is_neighbour_left = true;
+        }
+        let mut is_neighbour_right = false;
+        if i < max_i
+            && plant_grid.get(j).unwrap().get(i).unwrap().label
+                == plant_grid.get(j).unwrap().get(i + 1).unwrap().label
+        {
+            is_neighbour_right = true;
+        }
+        let mut is_neighbour_below = false;
+        if j < max_j
+            && plant_grid.get(j).unwrap().get(i).unwrap().label
+                == plant_grid.get(j + 1).unwrap().get(i).unwrap().label
+        {
+            is_neighbour_below = true;
+        }
+        let mut is_neighbour_above = false;
+        if j > 0
+            && plant_grid.get(j).unwrap().get(i).unwrap().label
+                == plant_grid.get(j - 1).unwrap().get(i).unwrap().label
+        {
+            is_neighbour_above = true;
+        }
+
+        let mut edges = 0;
+
+        if !is_neighbour_above && !is_neighbour_right {
+            edges += 1;
+        }
+        if !is_neighbour_below && !is_neighbour_right {
+            edges += 1;
+        }
+        if !is_neighbour_below && !is_neighbour_left {
+            edges += 1;
+        }
+        if !is_neighbour_above && !is_neighbour_left {
+            edges += 1;
+        }
+
+        let current_plant = self.plants.get_mut(j).unwrap().get_mut(i).unwrap();
+        current_plant.edges = Some(edges);
+    }
     // this calculates the cost of Map by area * perimeter of each group summed
     pub fn get_cost(&self) -> u64 {
         let mut cost = 0;
@@ -84,6 +138,22 @@ impl Map {
             let perimeter: u64 = group.clone().map(|p| p.borders.unwrap() as u64).sum();
             let area: u64 = group.count() as u64;
             cost += area * perimeter;
+        }
+        cost
+    }
+
+    pub fn get_cost_2(&self) -> u64 {
+        let mut cost = 0;
+        for i in 0..self.n_groups.unwrap() {
+            let group = self
+                .plants
+                .iter()
+                .flatten()
+                .filter(|p| p.group.unwrap() == i);
+            let number_external_edges: u64 = group.clone().map(|p| p.edges.unwrap() as u64).sum();
+            let number_sides = 4 + 2 * (number_external_edges - 4);
+            let area: u64 = group.count() as u64;
+            cost += area * number_sides;
         }
         cost
     }
@@ -154,13 +224,18 @@ impl Map {
             })
             .collect();
 
-        let borders = 4 - neighbours.len();
+        let num_neighbours = neighbours.len();
+
+        plant_grid.count_edges(i, j);
+
+        let borders = 4 - num_neighbours;
         let mut new_parent_group = None;
         {
             {
                 let current_plant = plant_grid.plants.get_mut(j).unwrap().get_mut(i).unwrap();
                 current_plant.borders = Some(borders);
             }
+            {}
             match parent_group {
                 Some(p) => {
                     let current_plant = plant_grid.plants.get_mut(j).unwrap().get_mut(i).unwrap();
@@ -214,10 +289,12 @@ pub fn day_twelve(path: &str) -> std::io::Result<()> {
     let mut map = Map::new(data);
     map.find_neighbours_and_borders();
     let result = map.get_cost();
+    let result_2 = map.get_cost_2();
 
     println!(
-        "the cost of the fence is {} and it took {}",
+        "the cost of the fence is {} or with discount {} and it took {}",
         result,
+        result_2,
         now.elapsed().as_micros(),
     );
     Ok(())
@@ -235,6 +312,7 @@ mod test {
             j: 0,
             group: None,
             borders: None,
+            edges: None,
         };
         let plant_b = Plant {
             label: 'b',
@@ -242,6 +320,7 @@ mod test {
             j: 0,
             group: None,
             borders: None,
+            edges: None,
         };
         let plant_c = Plant {
             label: 'c',
@@ -249,6 +328,7 @@ mod test {
             j: 0,
             group: None,
             borders: None,
+            edges: None,
         };
         let plant_d = Plant {
             label: 'd',
@@ -256,6 +336,7 @@ mod test {
             j: 0,
             group: None,
             borders: None,
+            edges: None,
         };
         let expected = Map {
             plants: vec![vec![plant_a, plant_b, plant_c, plant_d]],
@@ -273,8 +354,10 @@ mod test {
         let is_new = Map::search((0, 0), None, None, &mut map, Some(0));
         let actual_borders = map.plants.get(0).unwrap().get(0).unwrap().borders;
         let actual_group = map.plants.get(0).unwrap().get(0).unwrap().group;
+        let actual_edges = map.plants.get(0).unwrap().get(0).unwrap().edges;
         assert_eq!(Some(4), actual_borders);
         assert_eq!(Some(0), actual_group);
+        assert_eq!(Some(4), actual_edges);
         let expected_group = map.plants.get(0).unwrap().get(1).unwrap().group;
         assert_eq!(expected_group, None);
         let expected_group = map.plants.get(0).unwrap().get(2).unwrap().group;
@@ -288,12 +371,16 @@ mod test {
         Map::search((1, 0), None, None, &mut map, Some(0));
         let actual_borders = map.plants.get(0).unwrap().get(1).unwrap().borders;
         let actual_group = map.plants.get(0).unwrap().get(1).unwrap().group;
+        let actual_edges = map.plants.get(0).unwrap().get(1).unwrap().edges;
         assert_eq!(Some(3), actual_borders);
         assert_eq!(Some(0), actual_group);
+        assert_eq!(Some(2), actual_edges);
         let actual_borders = map.plants.get(0).unwrap().get(2).unwrap().borders;
         let actual_group = map.plants.get(0).unwrap().get(2).unwrap().group;
+        let actual_edges = map.plants.get(0).unwrap().get(2).unwrap().edges;
         assert_eq!(Some(3), actual_borders);
         assert_eq!(Some(0), actual_group);
+        assert_eq!(Some(2), actual_edges);
         let expected_group = map.plants.get(0).unwrap().get(0).unwrap().group;
         assert_eq!(expected_group, None);
         let expected_group = map.plants.get(0).unwrap().get(3).unwrap().group;
@@ -324,6 +411,28 @@ mod test {
     }
 
     #[test]
+    fn test_map_count_edges() {
+        let input = vec![vec!['a', 'b', 'c']];
+        let mut map = Map::new(input);
+
+        let (pos_i, pos_j) = (0, 0);
+        map.count_edges(pos_i, pos_j);
+        let actual = map.plants.get(pos_j).unwrap().get(pos_i).unwrap().edges;
+        let expected = Some(4);
+        assert_eq!(expected, actual);
+        let (pos_i, pos_j) = (1, 0);
+        map.count_edges(pos_i, pos_j);
+        let actual = map.plants.get(pos_j).unwrap().get(pos_i).unwrap().edges;
+        let expected = Some(4);
+        assert_eq!(expected, actual);
+        let (pos_i, pos_j) = (2, 0);
+        map.count_edges(pos_i, pos_j);
+        let actual = map.plants.get(pos_j).unwrap().get(pos_i).unwrap().edges;
+        let expected = Some(4);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
     fn test_map_get_cost() {
         let input = vec![vec!['a', 'b', 'c']];
         let expected = 12;
@@ -346,6 +455,20 @@ mod test {
         let mut map = Map::new(input);
         map.find_neighbours_and_borders();
         let actual = map.get_cost();
+        assert_eq!(expected, actual);
+    }
+    #[test]
+    fn test_map_get_cost_2_again() {
+        let input = vec![
+            vec!['a', 'a', 'a', 'a'],
+            vec!['b', 'b', 'c', 'd'],
+            vec!['b', 'b', 'c', 'c'],
+            vec!['e', 'e', 'e', 'c'],
+        ];
+        let expected = 80;
+        let mut map = Map::new(input);
+        map.find_neighbours_and_borders();
+        let actual = map.get_cost_2();
         assert_eq!(expected, actual);
     }
 }
