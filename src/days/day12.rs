@@ -108,6 +108,39 @@ impl Map {
             is_neighbour_above = true;
         }
 
+        let mut is_neighbour_above_right_diag = false;
+        if j > 0
+            && i < max_i
+            && plant_grid.get(j).unwrap().get(i).unwrap().label
+                == plant_grid.get(j - 1).unwrap().get(i + 1).unwrap().label
+        {
+            is_neighbour_above_right_diag = true;
+        }
+        let mut is_neighbour_below_right_diag = false;
+        if j < max_j
+            && i < max_i
+            && plant_grid.get(j).unwrap().get(i).unwrap().label
+                == plant_grid.get(j + 1).unwrap().get(i + 1).unwrap().label
+        {
+            is_neighbour_below_right_diag = true;
+        }
+        let mut is_neighbour_above_left_diag = false;
+        if i > 0
+            && j > 0
+            && plant_grid.get(j).unwrap().get(i).unwrap().label
+                == plant_grid.get(j - 1).unwrap().get(i - 1).unwrap().label
+        {
+            is_neighbour_above_left_diag = true;
+        }
+        let mut is_neighbour_below_left_diag = false;
+        if i > 0
+            && j < max_j
+            && plant_grid.get(j).unwrap().get(i).unwrap().label
+                == plant_grid.get(j + 1).unwrap().get(i - 1).unwrap().label
+        {
+            is_neighbour_below_left_diag = true;
+        }
+
         let mut edges = 0;
 
         if !is_neighbour_above && !is_neighbour_right {
@@ -120,6 +153,19 @@ impl Map {
             edges += 1;
         }
         if !is_neighbour_above && !is_neighbour_left {
+            edges += 1;
+        }
+
+        if is_neighbour_above && is_neighbour_left && !is_neighbour_above_left_diag {
+            edges += 1;
+        }
+        if is_neighbour_above && is_neighbour_right && !is_neighbour_above_right_diag {
+            edges += 1;
+        }
+        if is_neighbour_below && is_neighbour_right && !is_neighbour_below_right_diag {
+            edges += 1;
+        }
+        if is_neighbour_below && is_neighbour_left && !is_neighbour_below_left_diag {
             edges += 1;
         }
 
@@ -151,9 +197,15 @@ impl Map {
                 .flatten()
                 .filter(|p| p.group.unwrap() == i);
             let number_external_edges: u64 = group.clone().map(|p| p.edges.unwrap() as u64).sum();
-            let number_sides = 4 + 2 * (number_external_edges - 4);
             let area: u64 = group.count() as u64;
-            cost += area * number_sides;
+            println!(
+                "i:{}, number_edges {}, area {}, cost {}",
+                i,
+                number_external_edges,
+                area,
+                area * number_external_edges,
+            );
+            cost += area * number_external_edges;
         }
         cost
     }
@@ -429,6 +481,81 @@ mod test {
         map.count_edges(pos_i, pos_j);
         let actual = map.plants.get(pos_j).unwrap().get(pos_i).unwrap().edges;
         let expected = Some(4);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_map_count_edges_internal_edges() {
+        let input = vec![
+            vec!['a', 'b', 'c'],
+            vec!['a', 'b', 'b'],
+            vec!['a', 'd', 'b'],
+            vec!['a', 'a', 'a'],
+        ];
+        let mut map = Map::new(input);
+
+        let (pos_i, pos_j) = (0, 0);
+        map.count_edges(pos_i, pos_j);
+        let actual = map.plants.get(pos_j).unwrap().get(pos_i).unwrap().edges;
+        let expected = Some(2);
+        assert_eq!(expected, actual);
+        let (pos_i, pos_j) = (1, 0);
+        map.count_edges(pos_i, pos_j);
+        let actual = map.plants.get(pos_j).unwrap().get(pos_i).unwrap().edges;
+        let expected = Some(2);
+        assert_eq!(expected, actual);
+        let (pos_i, pos_j) = (2, 0);
+        map.count_edges(pos_i, pos_j);
+        let actual = map.plants.get(pos_j).unwrap().get(pos_i).unwrap().edges;
+        let expected = Some(4);
+        assert_eq!(expected, actual);
+
+        let (pos_i, pos_j) = (0, 1);
+        map.count_edges(pos_i, pos_j);
+        let actual = map.plants.get(pos_j).unwrap().get(pos_i).unwrap().edges;
+        let expected = Some(0);
+        assert_eq!(expected, actual);
+        let (pos_i, pos_j) = (1, 1);
+        map.count_edges(pos_i, pos_j);
+        let actual = map.plants.get(pos_j).unwrap().get(pos_i).unwrap().edges;
+        let expected = Some(2);
+        assert_eq!(expected, actual);
+        let (pos_i, pos_j) = (2, 1);
+        map.count_edges(pos_i, pos_j);
+        let actual = map.plants.get(pos_j).unwrap().get(pos_i).unwrap().edges;
+        let expected = Some(2);
+        assert_eq!(expected, actual);
+
+        let (pos_i, pos_j) = (0, 2);
+        map.count_edges(pos_i, pos_j);
+        let actual = map.plants.get(pos_j).unwrap().get(pos_i).unwrap().edges;
+        let expected = Some(0);
+        assert_eq!(expected, actual);
+        let (pos_i, pos_j) = (1, 2);
+        map.count_edges(pos_i, pos_j);
+        let actual = map.plants.get(pos_j).unwrap().get(pos_i).unwrap().edges;
+        let expected = Some(4);
+        assert_eq!(expected, actual);
+        let (pos_i, pos_j) = (2, 2);
+        map.count_edges(pos_i, pos_j);
+        let actual = map.plants.get(pos_j).unwrap().get(pos_i).unwrap().edges;
+        let expected = Some(2);
+        assert_eq!(expected, actual);
+
+        let (pos_i, pos_j) = (0, 3);
+        map.count_edges(pos_i, pos_j);
+        let actual = map.plants.get(pos_j).unwrap().get(pos_i).unwrap().edges;
+        let expected = Some(2);
+        assert_eq!(expected, actual);
+        let (pos_i, pos_j) = (1, 3);
+        map.count_edges(pos_i, pos_j);
+        let actual = map.plants.get(pos_j).unwrap().get(pos_i).unwrap().edges;
+        let expected = Some(0);
+        assert_eq!(expected, actual);
+        let (pos_i, pos_j) = (2, 3);
+        map.count_edges(pos_i, pos_j);
+        let actual = map.plants.get(pos_j).unwrap().get(pos_i).unwrap().edges;
+        let expected = Some(2);
         assert_eq!(expected, actual);
     }
 
