@@ -76,8 +76,12 @@ impl Game {
             return 0;
         }
         if self.is_colinear() {
-            let ratio_x = (self.t.x) / (self.b.x);
-            return ratio_x as u64;
+            let ratio_b_x = (self.t.x) / (self.b.x);
+            let ratio_a_x = (self.t.x) / (self.a.x);
+            if 3 * ratio_a_x < ratio_b_x {
+                return 3 * ratio_a_x as u64;
+            }
+            return ratio_b_x as u64;
         }
         let beta = (self.a.x * self.t.y - self.a.y * self.t.x) / self.det;
         let alpha = (self.b.y * self.t.x - self.b.x * self.t.y) / self.det;
