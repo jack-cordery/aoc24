@@ -119,7 +119,10 @@ pub fn day_thirteen(path: &str) -> std::io::Result<()> {
 
             let a = Vector::new(*a.first().unwrap(), *a.get(1).unwrap());
             let b = Vector::new(*b.first().unwrap(), *b.get(1).unwrap());
-            let t = Vector::new(*t.first().unwrap(), *t.get(1).unwrap());
+            let t = Vector::new(
+                *t.first().unwrap() + 10000000000000,
+                *t.get(1).unwrap() + 10000000000000,
+            );
 
             let h = Game::new(a, b, t);
 
