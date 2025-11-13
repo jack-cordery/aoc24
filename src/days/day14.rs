@@ -74,6 +74,16 @@ impl Grid {
         }
     }
 
+    pub fn print(&self) {
+        let mut print_grid = vec![vec!['.'; self.size_x]; self.size_y];
+        for r in &self.robots {
+            print_grid[r.pos.y][r.pos.x] = 'X';
+        }
+        for row in print_grid.iter() {
+            println!("{}", row.iter().collect::<String>());
+        }
+    }
+
     pub fn simulate(&mut self, steps: usize) {
         self.robots
             .iter_mut()
@@ -153,15 +163,14 @@ pub fn day_fourteen(path: &str) -> std::io::Result<()> {
 
     let mut grid = Grid::new(101, 103, robots);
 
-    grid.simulate(100);
+    for i in 0..10000 {
+        println!("step {}", i);
 
-    let score = grid.calculate_quad_score();
+        grid.simulate(1);
+        grid.print();
+        println!("-------------------------------------");
+    }
 
-    println!(
-        "the score  is {}  and it took {}",
-        score,
-        now.elapsed().as_micros(),
-    );
     Ok(())
 }
 
