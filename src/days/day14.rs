@@ -1,4 +1,9 @@
-use std::{fs::read_to_string, time::Instant};
+use core::f64;
+use std::{
+    f64::consts::{self, PI},
+    fs::read_to_string,
+    time::Instant,
+};
 
 use regex::Regex;
 
@@ -90,6 +95,25 @@ impl Grid {
             .for_each(|r| r.step(&steps, &self.size_x, &self.size_y));
     }
 
+    pub fn calculate_kde(&self, robot: &Robot, h: f64) -> f64 {
+        let mut result = 0.0;
+        for r in &self.robots {
+            result += (((robot.pos.x - r.pos.x) * (robot.pos.x - r.pos.x)
+                + (robot.pos.y - r.pos.y) * (robot.pos.y - r.pos.y)) as f64)
+                / (2.0 * h);
+        }
+        result / (2.0 * PI)
+    }
+
+    pub fn calculate_entropy(&self, h: f64) -> f64 {
+        let mut result = 0.0;
+        for r in &self.robots {
+            let p = self.calculate_kde(r, h);
+            result -= p * p.log2();
+        }
+        result
+    }
+
     pub fn calculate_quad_score(&self) -> usize {
         // so this draws a line down the middle in both x and y and then counts the number of
         // robots in each quad. the robots on the line dont count
@@ -163,13 +187,15 @@ pub fn day_fourteen(path: &str) -> std::io::Result<()> {
 
     let mut grid = Grid::new(101, 103, robots);
 
-    for i in 0..10000 {
-        println!("step {}", i);
+    let mut entropies = vec![];
 
+    for i in 1..10000 {
         grid.simulate(1);
-        grid.print();
-        println!("-------------------------------------");
+        entropies.push((i, grid.calculate_entropy(2.0)));
     }
+
+    entropies.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+    println!("entropies {:?}", entropies);
 
     Ok(())
 }
