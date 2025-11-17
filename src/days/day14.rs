@@ -191,7 +191,7 @@ pub fn day_fourteen(path: &str) -> std::io::Result<()> {
 
     for i in 1..10000 {
         grid.simulate(1);
-        entropies.push((i, grid.calculate_entropy(2.0)));
+        entropies.push((i, grid.calculate_entropy(0.5)));
     }
 
     entropies.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
